@@ -6,9 +6,11 @@
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
-// Default build target stays Cloudflare (Lovable's default). Set DEPLOY_TARGET=vercel
-// to produce a Vercel-compatible build instead (used for one-off `vercel deploy` pushes).
-const deployTarget = process.env["DEPLOY_TARGET"];
+// Default build target stays Cloudflare (Lovable's default). The build automatically switches
+// to the Vercel-compatible Nitro preset when running on Vercel's own build infrastructure
+// (Vercel always sets the VERCEL env var), or when DEPLOY_TARGET=vercel is set explicitly
+// (used for one-off `vercel deploy` pushes from a non-Vercel CI environment).
+const isVercelBuild = process.env["DEPLOY_TARGET"] === "vercel" || Boolean(process.env["VERCEL"]);
 
 export default defineConfig({
   tanstackStart: {
@@ -16,5 +18,5 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
-  ...(deployTarget === "vercel" ? { nitro: { preset: "vercel" } } : {}),
+  ...(isVercelBuild ? { nitro: { preset: "vercel" } } : {}),
 });
