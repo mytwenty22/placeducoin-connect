@@ -166,6 +166,8 @@ function ShopSite() {
               <img
                 src={offer.photoUrl}
                 alt={offer.shop}
+                loading="lazy"
+                decoding="async"
                 className="aspect-square rounded-2xl object-cover shadow-card"
               />
             ) : null}

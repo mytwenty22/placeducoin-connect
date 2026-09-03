@@ -31,7 +31,13 @@ export function OfferCard({
     <article className={`${styles.cardClass} hover-lift flex flex-col overflow-hidden`}>
       {offer.photoUrl ? (
         <div className="relative">
-          <img src={offer.photoUrl} alt="" className="h-32 w-full object-cover" />
+          <img
+            src={offer.photoUrl}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className="h-32 w-full object-cover"
+          />
           {offer.logoUrl ? (
             <img
               src={offer.logoUrl}

@@ -336,6 +336,8 @@ function StandaloneSite() {
                         <img
                           src={p.photo_url}
                           alt=""
+                          loading="lazy"
+                          decoding="async"
                           className="h-14 w-14 shrink-0 rounded-xl object-cover"
                         />
                       ) : null}
@@ -397,6 +399,8 @@ function StandaloneSite() {
                         <img
                           src={p.photo_url}
                           alt=""
+                          loading="lazy"
+                          decoding="async"
                           className="h-14 w-14 shrink-0 rounded-xl object-cover"
                         />
                       ) : (
@@ -450,6 +454,8 @@ function StandaloneSite() {
                         <img
                           src={url}
                           alt={`Photo ${i + 1} de ${commerce.nom}`}
+                          loading="lazy"
+                          decoding="async"
                           className="h-full w-full object-cover transition-transform duration-300 hover:scale-110"
                         />
                       </div>
