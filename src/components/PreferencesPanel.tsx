@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Settings, BellRing, BellOff } from "lucide-react";
+import { toast } from "sonner";
+import { Settings, BellRing, BellOff, MailCheck } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -9,15 +10,57 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CATEGORIES } from "@/lib/placeducoin-data";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { CATEGORIES, type CategoryKey } from "@/lib/placeducoin-data";
 import { useUserPrefs } from "@/lib/user-prefs";
+import { supabase } from "@/lib/supabase";
 
 const PREFERENCE_CATEGORIES = CATEGORIES.filter((c) => c.key !== "locale");
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_RE = /^[0-9+()\s.-]{6,}$/;
+
+function detectContactType(value: string): "email" | "phone" | null {
+  const trimmed = value.trim();
+  if (EMAIL_RE.test(trimmed)) return "email";
+  if (PHONE_RE.test(trimmed) && /\d{6,}/.test(trimmed.replace(/\D/g, ""))) return "phone";
+  return null;
+}
 
 export function PreferencesPanel() {
   const [open, setOpen] = useState(false);
   const { favoriteCategories, toggleCategory, pushPermission, requestPushPermission } =
     useUserPrefs();
+  const [contact, setContact] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const saveAlertContact = async () => {
+    const contactType = detectContactType(contact);
+    if (!contactType) {
+      toast.error("Entre un numéro de téléphone ou un e-mail valide.");
+      return;
+    }
+
+    const categories: CategoryKey[] =
+      favoriteCategories.length > 0
+        ? [...favoriteCategories, "locale"]
+        : CATEGORIES.map((c) => c.key);
+
+    setSaving(true);
+    const { error } = await supabase.from("alert_subscriptions").insert({
+      contact: contact.trim(),
+      contact_type: contactType,
+      categories,
+    });
+    setSaving(false);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("C'est noté, tu recevras les alertes des commerces et de la mairie.");
+    setContact("");
+  };
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -56,6 +99,34 @@ export function PreferencesPanel() {
               </label>
             ))}
           </div>
+        </div>
+
+        <div className="mt-6 border-t border-border pt-4">
+          <h3 className="text-sm font-semibold text-foreground">Alertes par SMS ou e-mail</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Reçois les alertes des commerces et de la mairie pour les catégories choisies ci-dessus,
+            même hors ligne.
+          </p>
+          <form
+            className="mt-3 flex items-center gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void saveAlertContact();
+            }}
+          >
+            <Input
+              type="text"
+              inputMode="email"
+              placeholder="06 12 34 56 78 ou vous@exemple.fr"
+              value={contact}
+              onChange={(e) => setContact(e.target.value)}
+              disabled={saving}
+              aria-label="Numéro de téléphone ou e-mail"
+            />
+            <Button type="submit" size="sm" disabled={saving || contact.trim().length === 0}>
+              <MailCheck className="h-3.5 w-3.5" /> Enregistrer
+            </Button>
+          </form>
         </div>
 
         <div className="mt-6 border-t border-border pt-4">
