@@ -55,6 +55,8 @@ export type Offer = {
   hours: { day: string; value: string }[];
   services: { name: string; price: string }[];
   premium?: boolean;
+  commerceId?: string;
+  promoId?: string;
   photoUrl?: string;
   logoUrl?: string;
   horaires?: Horaire[];

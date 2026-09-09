@@ -1,9 +1,12 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { Phone, Navigation, Clock, Flame } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { GoogleRatingStars } from "@/components/GoogleRatingStars";
+import { CouponButton } from "@/components/CouponButton";
 import { getOffer, type CategoryKey, type Offer } from "@/lib/placeducoin-data";
 import { supabase } from "@/lib/supabase";
+import { logStatEvent, isFromGoogleReferrer } from "@/lib/stats-tracking";
 
 async function loadRealOffer(slug: string): Promise<Offer | null> {
   const { data: commerce } = await supabase
@@ -17,7 +20,7 @@ async function loadRealOffer(slug: string): Promise<Offer | null> {
 
   const { data: promo } = await supabase
     .from("promos")
-    .select("titre, kind, photo_url, prix_avant, prix_maintenant, valide_jusqu_a")
+    .select("id, titre, kind, photo_url, prix_avant, prix_maintenant, valide_jusqu_a")
     .eq("commerce_id", commerce.id)
     .in("kind", ["promo", "arrivage"])
     .gt("valide_jusqu_a", new Date().toISOString())
@@ -40,6 +43,8 @@ async function loadRealOffer(slug: string): Promise<Offer | null> {
     distanceKm: 0,
     title: promo?.titre ?? "",
     kind: promo?.kind ?? "promo",
+    commerceId: commerce.id,
+    ...(promo?.id ? { promoId: promo.id } : {}),
     ...(promo?.prix_avant != null ? { priceBefore: promo.prix_avant } : {}),
     ...(promo?.prix_maintenant != null ? { priceNow: promo.prix_maintenant } : {}),
     endsInHours,
@@ -95,6 +100,11 @@ const GALLERY = [
 function ShopSite() {
   const { offer } = Route.useLoaderData();
   const hasPromo = offer.endsInHours > 0;
+
+  useEffect(() => {
+    void logStatEvent(offer.commerceId, "app_view");
+    if (isFromGoogleReferrer()) void logStatEvent(offer.commerceId, "google_view");
+  }, [offer.commerceId]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -156,6 +166,11 @@ function ShopSite() {
                 </span>
               </div>
             </div>
+            {offer.kind !== "evenement" && offer.promoId ? (
+              <div className="px-5 py-4">
+                <CouponButton commerceId={offer.commerceId} />
+              </div>
+            ) : null}
           </section>
         ) : null}
 

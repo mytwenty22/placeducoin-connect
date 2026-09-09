@@ -18,6 +18,13 @@ import {
   LogOut,
   Package,
   Upload,
+  BarChart3,
+  Eye,
+  Search as SearchIcon,
+  Ticket,
+  CheckCircle2,
+  Megaphone,
+  Ban,
 } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { EmailPasswordLogin } from "@/components/EmailPasswordLogin";
@@ -29,6 +36,8 @@ import { CATEGORIES, type CategoryKey } from "@/lib/placeducoin-data";
 import type { Horaire } from "@/lib/horaires";
 import { THEME_OPTIONS, THEME_STYLES, type ThemeVisuel } from "@/lib/site-theme";
 import { getReadableTextColor } from "@/lib/color";
+
+type AccountType = "pro" | "association";
 
 export const Route = createFileRoute("/pro")({
   head: () => ({
@@ -49,8 +58,8 @@ export const Route = createFileRoute("/pro")({
   component: ProSpace,
 });
 
-type Profile = { role: "mairie" | "pro" | "admin" };
-type Ville = { id: string; nom: string };
+type Profile = { role: "mairie" | "pro" | "association" | "admin" };
+type Ville = { id: string; nom: string; slug?: string };
 type Commerce = {
   id: string;
   slug: string;
@@ -191,6 +200,7 @@ function ProAuthGate() {
 function ProSignupForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [accountType, setAccountType] = useState<AccountType>("pro");
   const [loading, setLoading] = useState(false);
 
   return (
@@ -208,7 +218,7 @@ function ProSignupForm() {
         if (data.session && data.user) {
           const { error: profileError } = await supabase
             .from("profiles")
-            .upsert({ id: data.user.id, role: "pro" }, { onConflict: "id" });
+            .upsert({ id: data.user.id, role: accountType }, { onConflict: "id" });
           if (profileError) toast.error(profileError.message);
         } else {
           toast.success("Compte créé — vérifiez votre boîte mail pour confirmer votre adresse.");
@@ -218,8 +228,38 @@ function ProSignupForm() {
     >
       <div className="flex items-center gap-2">
         <Store className="h-5 w-5 text-navy" />
-        <h1 className="font-display text-lg font-extrabold text-foreground">Créer un compte Pro</h1>
+        <h1 className="font-display text-lg font-extrabold text-foreground">
+          Créer un compte {accountType === "association" ? "Association" : "Pro"}
+        </h1>
       </div>
+
+      <div className="block">
+        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Type de compte
+        </span>
+        <div className="mt-1.5 grid grid-cols-2 gap-2">
+          {(
+            [
+              { key: "pro" as const, label: "Commerçant" },
+              { key: "association" as const, label: "Association" },
+            ] as const
+          ).map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setAccountType(t.key)}
+              className={`rounded-xl border px-3 py-2.5 text-sm font-semibold transition-colors ${
+                accountType === t.key
+                  ? "border-transparent bg-navy text-primary-foreground"
+                  : "border-input bg-card text-foreground hover:bg-secondary"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <label className="block">
         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Email
@@ -257,7 +297,9 @@ function ProSignupForm() {
 }
 
 function ProDashboard({ userId }: { userId: string }) {
-  const [screen, setScreen] = useState<"profil" | "promo" | "catalogue" | "options">("profil");
+  const [screen, setScreen] = useState<"profil" | "promo" | "catalogue" | "stats" | "options">(
+    "profil",
+  );
   const queryClient = useQueryClient();
 
   const profileQuery = useQuery({
@@ -309,7 +351,7 @@ function ProDashboard({ userId }: { userId: string }) {
       if (error) throw error;
       return data as Commerce | null;
     },
-    enabled: profileQuery.data?.role === "pro",
+    enabled: profileQuery.data?.role === "pro" || profileQuery.data?.role === "association",
   });
 
   const activateMutation = useMutation({
@@ -354,14 +396,22 @@ function ProDashboard({ userId }: { userId: string }) {
     return <p className="text-sm text-muted-foreground">Préparation de votre profil…</p>;
   }
 
-  if (profileQuery.data.role !== "pro") {
+  if (profileQuery.data.role !== "pro" && profileQuery.data.role !== "association") {
     return <p className="text-sm text-foreground">Ce compte n'a pas les droits Pro.</p>;
   }
+
+  const accountType: AccountType = profileQuery.data.role;
 
   if (commerceQuery.isLoading) return <p className="text-sm text-muted-foreground">Chargement…</p>;
 
   if (!commerceQuery.data) {
-    return <CreateCommerceForm userId={userId} onCreated={() => commerceQuery.refetch()} />;
+    return (
+      <CreateCommerceForm
+        userId={userId}
+        accountType={accountType}
+        onCreated={() => commerceQuery.refetch()}
+      />
+    );
   }
 
   const commerce = commerceQuery.data;
@@ -378,7 +428,7 @@ function ProDashboard({ userId }: { userId: string }) {
         ) : null}
         <div className="min-w-0">
           <h1 className="font-display text-2xl font-extrabold text-foreground">
-            Espace commerçant
+            {accountType === "association" ? "Espace association" : "Espace commerçant"}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">{commerce.nom}</p>
         </div>
@@ -411,18 +461,26 @@ function ProDashboard({ userId }: { userId: string }) {
           <ProfileScreen
             commerce={commerce}
             userId={userId}
+            accountType={accountType}
             onUpdated={() => queryClient.invalidateQueries({ queryKey: ["commerce", userId] })}
           />
         ) : null}
         {screen === "promo" ? (
-          <PromoScreen userId={userId} commerceId={commerce.id} boosted={commerce.boost_actif} />
+          <PromoScreen
+            userId={userId}
+            commerceId={commerce.id}
+            boosted={commerce.boost_actif}
+            accountType={accountType}
+          />
         ) : null}
         {screen === "catalogue" ? (
           <CatalogueScreen userId={userId} commerceId={commerce.id} />
         ) : null}
+        {screen === "stats" ? <StatsScreen commerceId={commerce.id} /> : null}
         {screen === "options" ? (
           <OptionsScreen
             commerce={commerce}
+            accountType={accountType}
             pending={activateMutation.isPending}
             onActivateSite={() => activateMutation.mutate("site_actif")}
             onActivateBoost={() => activateMutation.mutate("boost_actif")}
@@ -431,12 +489,17 @@ function ProDashboard({ userId }: { userId: string }) {
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card">
-        <div className="mx-auto grid max-w-lg grid-cols-4">
+        <div className="mx-auto grid max-w-lg grid-cols-5">
           {(
             [
               { key: "profil", label: "Mon Profil", icon: Store },
-              { key: "promo", label: "Promo Flash", icon: Zap },
+              {
+                key: "promo",
+                label: accountType === "association" ? "Événement Flash" : "Promo Flash",
+                icon: Zap,
+              },
               { key: "catalogue", label: "Catalogue", icon: Package },
+              { key: "stats", label: "Statistiques", icon: BarChart3 },
               { key: "options", label: "Visibilité", icon: CreditCard },
             ] as const
           ).map(({ key, label, icon: Icon }) => (
@@ -497,10 +560,21 @@ async function insertCommerceWithUniqueSlug(input: {
   throw new Error("Impossible de générer un identifiant unique pour ce commerce.");
 }
 
-function CreateCommerceForm({ userId, onCreated }: { userId: string; onCreated: () => void }) {
+function CreateCommerceForm({
+  userId,
+  accountType,
+  onCreated,
+}: {
+  userId: string;
+  accountType: AccountType;
+  onCreated: () => void;
+}) {
+  const isAssociation = accountType === "association";
   const [nom, setNom] = useState("");
   const [trade, setTrade] = useState("");
-  const [category, setCategory] = useState<CategoryKey>(CATEGORIES[0]?.key ?? "bouche");
+  const [category, setCategory] = useState<CategoryKey>(
+    isAssociation ? "locale" : (CATEGORIES[0]?.key ?? "bouche"),
+  );
   const [villeId, setVilleId] = useState("");
   const [adresse, setAdresse] = useState("");
   const [telephone, setTelephone] = useState("");
@@ -531,7 +605,7 @@ function CreateCommerceForm({ userId, onCreated }: { userId: string; onCreated: 
             ville_id: villeId,
             nom,
             trade,
-            category,
+            category: isAssociation ? "locale" : category,
             adresse,
             telephone,
           });
@@ -544,42 +618,53 @@ function CreateCommerceForm({ userId, onCreated }: { userId: string; onCreated: 
       }}
     >
       <h2 className="font-display text-lg font-extrabold text-foreground">
-        Créer ma fiche commerce
+        {isAssociation ? "Créer ma fiche association" : "Créer ma fiche commerce"}
       </h2>
 
       <Field
-        label="Nom de l'entreprise"
+        label={isAssociation ? "Nom de l'association" : "Nom de l'entreprise"}
         value={nom}
         onChange={setNom}
-        placeholder="Boucherie Lantoine"
+        placeholder={isAssociation ? "Association des commerçants" : "Boucherie Lantoine"}
       />
 
-      <label className="block">
-        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Catégorie principale *
-        </span>
-        <select
-          required
-          value={category}
-          onChange={(e) => setCategory(e.target.value as CategoryKey)}
-          className="mt-1 w-full rounded-xl border border-input bg-card px-3 py-2.5 text-sm text-foreground outline-none focus:border-navy"
-        >
-          {CATEGORIES.map((c) => (
-            <option key={c.key} value={c.key}>
-              {c.label}
-            </option>
-          ))}
-        </select>
-        <span className="mt-1 block text-xs text-muted-foreground">
-          Détermine dans quel onglet votre fiche apparaît sur la Marketplace.
-        </span>
-      </label>
+      {isAssociation ? (
+        <p className="rounded-xl bg-secondary p-3 text-xs text-muted-foreground">
+          Votre fiche apparaît automatiquement dans l'onglet « Vie Locale & Mairie » de la
+          Marketplace.
+        </p>
+      ) : (
+        <label className="block">
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Catégorie principale *
+          </span>
+          <select
+            required
+            value={category}
+            onChange={(e) => setCategory(e.target.value as CategoryKey)}
+            className="mt-1 w-full rounded-xl border border-input bg-card px-3 py-2.5 text-sm text-foreground outline-none focus:border-navy"
+          >
+            {CATEGORIES.map((c) => (
+              <option key={c.key} value={c.key}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+          <span className="mt-1 block text-xs text-muted-foreground">
+            Détermine dans quel onglet votre fiche apparaît sur la Marketplace.
+          </span>
+        </label>
+      )}
 
       <Field
-        label="Métier (optionnel)"
+        label={isAssociation ? "Activité (optionnel)" : "Métier (optionnel)"}
         value={trade}
         onChange={setTrade}
-        placeholder="Ex : Boucher, Coiffeur, Ludothèque"
+        placeholder={
+          isAssociation
+            ? "Ex : Club sportif, Comité des fêtes"
+            : "Ex : Boucher, Coiffeur, Ludothèque"
+        }
       />
 
       <label className="block">
@@ -675,12 +760,15 @@ async function uploadCommerceFile(
 function ProfileScreen({
   commerce,
   userId,
+  accountType,
   onUpdated,
 }: {
   commerce: Commerce;
   userId: string;
+  accountType: AccountType;
   onUpdated: () => void;
 }) {
+  const isAssociation = accountType === "association";
   const router = useRouter();
   const [nom, setNom] = useState(commerce.nom);
   const [trade, setTrade] = useState(commerce.trade);
@@ -1050,31 +1138,37 @@ function ProfileScreen({
           </div>
         </div>
 
-        <div className="block">
-          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Catégorie sur le site
-          </span>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {CATEGORIES.map((c) => (
-              <button
-                key={c.key}
-                type="button"
-                disabled={savingCategory}
-                onClick={() => handleCategoryClick(c.key)}
-                className={`rounded-full border px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-60 ${
-                  category === c.key
-                    ? "border-transparent bg-primary text-primary-foreground"
-                    : "border-border bg-card text-foreground hover:bg-secondary"
-                }`}
-              >
-                {c.label}
-              </button>
-            ))}
+        {isAssociation ? null : (
+          <div className="block">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Catégorie sur le site
+            </span>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {CATEGORIES.map((c) => (
+                <button
+                  key={c.key}
+                  type="button"
+                  disabled={savingCategory}
+                  onClick={() => handleCategoryClick(c.key)}
+                  className={`rounded-full border px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-60 ${
+                    category === c.key
+                      ? "border-transparent bg-primary text-primary-foreground"
+                      : "border-border bg-card text-foreground hover:bg-secondary"
+                  }`}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
-        <Field label="Nom de l'entreprise" value={nom} onChange={setNom} />
-        <Field label="Métier" value={trade} onChange={setTrade} />
+        <Field
+          label={isAssociation ? "Nom de l'association" : "Nom de l'entreprise"}
+          value={nom}
+          onChange={setNom}
+        />
+        <Field label={isAssociation ? "Activité" : "Métier"} value={trade} onChange={setTrade} />
         <Field
           label="Présentation"
           value={description}
@@ -1149,14 +1243,19 @@ function PromoScreen({
   userId,
   commerceId,
   boosted,
+  accountType,
 }: {
   userId: string;
   commerceId: string;
   boosted: boolean;
+  accountType: AccountType;
 }) {
+  const isAssociation = accountType === "association";
   const queryClient = useQueryClient();
   const [titre, setTitre] = useState("");
-  const [kind, setKind] = useState<"promo" | "arrivage" | "evenement">("promo");
+  const [kind, setKind] = useState<"promo" | "arrivage" | "evenement">(
+    isAssociation ? "evenement" : "promo",
+  );
   const [description, setDescription] = useState("");
   const [photoUrl, setPhotoUrl] = useState("");
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -1275,6 +1374,18 @@ function PromoScreen({
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const validateCouponMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("commerce_stats_events").insert({
+        commerce_id: commerceId,
+        event_type: "coupon_validated",
+      });
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => toast.success("Coupon marqué comme validé — comptabilisé dans Statistiques."),
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   return (
     <div className="space-y-6">
       <form
@@ -1286,11 +1397,13 @@ function PromoScreen({
         }}
       >
         <h2 className="font-display text-lg font-extrabold text-foreground">
-          Publier une offre ou un événement
+          {isAssociation ? "Publier un événement" : "Publier une offre ou un événement"}
         </h2>
-        <p className="text-xs text-muted-foreground">
-          {activePromoCount}/{MAX_ACTIVE_PROMOS} promotions actives
-        </p>
+        {isAssociation ? null : (
+          <p className="text-xs text-muted-foreground">
+            {activePromoCount}/{MAX_ACTIVE_PROMOS} promotions actives
+          </p>
+        )}
 
         {limitReached ? (
           <p className="rounded-xl bg-promo/10 p-3 text-xs font-semibold text-promo">
@@ -1299,22 +1412,24 @@ function PromoScreen({
           </p>
         ) : null}
 
-        <div className="flex flex-wrap gap-2">
-          {(["promo", "arrivage", "evenement"] as const).map((k) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => setKind(k)}
-              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                kind === k
-                  ? "border-transparent bg-navy text-primary-foreground"
-                  : "border-border bg-card text-foreground hover:bg-secondary"
-              }`}
-            >
-              {k === "promo" ? "Promo" : k === "arrivage" ? "Arrivage" : "Événement"}
-            </button>
-          ))}
-        </div>
+        {isAssociation ? null : (
+          <div className="flex flex-wrap gap-2">
+            {(["promo", "arrivage", "evenement"] as const).map((k) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setKind(k)}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  kind === k
+                    ? "border-transparent bg-navy text-primary-foreground"
+                    : "border-border bg-card text-foreground hover:bg-secondary"
+                }`}
+              >
+                {k === "promo" ? "Promo" : k === "arrivage" ? "Arrivage" : "Événement"}
+              </button>
+            ))}
+          </div>
+        )}
 
         <Field
           label={isEvent ? "Titre de l'événement" : "Votre offre"}
@@ -1466,6 +1581,18 @@ function PromoScreen({
                   {!expired && p.kind !== "evenement" ? (
                     <button
                       type="button"
+                      title="Valider un coupon utilisé en caisse"
+                      aria-label={`Valider un coupon pour ${p.titre}`}
+                      onClick={() => validateCouponMutation.mutate()}
+                      disabled={validateCouponMutation.isPending}
+                      className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-emerald-600 disabled:opacity-60"
+                    >
+                      <CheckCircle2 className="h-4 w-4" />
+                    </button>
+                  ) : null}
+                  {!expired && p.kind !== "evenement" ? (
+                    <button
+                      type="button"
                       title="Simuler expiration 24h"
                       aria-label={`Simuler l'expiration de ${p.titre}`}
                       onClick={() => expireMutation.mutate(p.id)}
@@ -1493,13 +1620,282 @@ function PromoScreen({
   );
 }
 
+const STAT_TILES = [
+  { type: "app_view" as const, label: "Vues App", icon: Eye, tone: "text-navy" },
+  { type: "google_view" as const, label: "Vues Google (SEO)", icon: SearchIcon, tone: "text-navy" },
+  { type: "coupon_open" as const, label: "Coupons Ouverts", icon: Ticket, tone: "text-promo" },
+  {
+    type: "coupon_validated" as const,
+    label: "Coupons Validés",
+    icon: CheckCircle2,
+    tone: "text-emerald-600",
+  },
+];
+
+function StatsScreen({ commerceId }: { commerceId: string }) {
+  const statsQuery = useQuery({
+    queryKey: ["commerce-stats", commerceId],
+    queryFn: async () => {
+      const counts = await Promise.all(
+        STAT_TILES.map(async ({ type }) => {
+          const { count, error } = await supabase
+            .from("commerce_stats_events")
+            .select("id", { count: "exact", head: true })
+            .eq("commerce_id", commerceId)
+            .eq("event_type", type);
+          if (error) throw new Error(error.message);
+          return [type, count ?? 0] as const;
+        }),
+      );
+      return Object.fromEntries(counts) as Record<(typeof STAT_TILES)[number]["type"], number>;
+    },
+  });
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="font-display text-lg font-extrabold text-foreground">Statistiques</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Suivi en direct de la visibilité et des coupons de votre fiche.
+        </p>
+      </div>
+
+      {statsQuery.isLoading ? (
+        <p className="text-sm text-muted-foreground">Chargement…</p>
+      ) : statsQuery.isError ? (
+        <p className="text-sm text-foreground">
+          Erreur lors du chargement des statistiques : {(statsQuery.error as Error).message}
+        </p>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          {STAT_TILES.map(({ type, label, icon: Icon, tone }) => (
+            <article key={type} className="surface-card p-4">
+              <Icon className={`h-5 w-5 ${tone}`} />
+              <p className="mt-2 font-display text-2xl font-extrabold text-foreground">
+                {statsQuery.data?.[type] ?? 0}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{label}</p>
+            </article>
+          ))}
+        </div>
+      )}
+
+      <p className="rounded-xl bg-secondary p-3 text-xs text-muted-foreground">
+        Vues App et Vues Google se comptabilisent à chaque visite de votre fiche (Google = trafic
+        venu d'une recherche Google). Coupons Ouverts se comptabilise quand un client révèle votre
+        offre ; Coupons Validés quand vous confirmez son utilisation en caisse depuis l'onglet Promo
+        Flash.
+      </p>
+    </div>
+  );
+}
+
+type BannerReservation = {
+  id: string;
+  position: "top" | "bottom";
+  active: boolean;
+  city_slug: string;
+};
+
+type BannerZone = { department_code: string; max_active_banners: number };
+
+function BannerReservationCard({ commerce }: { commerce: Commerce }) {
+  const queryClient = useQueryClient();
+  const [position, setPosition] = useState<"top" | "bottom">("top");
+
+  const villeQuery = useQuery({
+    queryKey: ["ville", commerce.ville_id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("villes")
+        .select("id, nom, slug, department_code")
+        .eq("id", commerce.ville_id)
+        .maybeSingle();
+      if (error) throw error;
+      return data as (Ville & { department_code: string | null }) | null;
+    },
+  });
+
+  const zonesQuery = useQuery({
+    queryKey: ["banner-zones"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("banner_zones")
+        .select("department_code, max_active_banners");
+      if (error) throw error;
+      return data as BannerZone[];
+    },
+  });
+
+  const reservationsQuery = useQuery({
+    queryKey: ["banner-reservations", commerce.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("banners")
+        .select("id, position, active, city_slug")
+        .eq("commerce_id", commerce.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as BannerReservation[];
+    },
+  });
+
+  const departmentCode = villeQuery.data?.department_code ?? null;
+
+  // How many other active banners already run in this département — checked client-side against
+  // max_active_banners for a clear message; the RLS insert policy is what actually enforces the
+  // zone restriction (a business outside 33/47 can never insert regardless of this UI check).
+  const activeInDepartmentQuery = useQuery({
+    queryKey: ["banner-active-count", departmentCode],
+    queryFn: async () => {
+      const { data: villesInDept, error: villesError } = await supabase
+        .from("villes")
+        .select("slug")
+        .eq("department_code", departmentCode as string);
+      if (villesError) throw villesError;
+      const slugs = (villesInDept ?? []).map((v) => v.slug);
+      if (slugs.length === 0) return 0;
+      const { count, error } = await supabase
+        .from("banners")
+        .select("id", { count: "exact", head: true })
+        .in("city_slug", slugs)
+        .eq("active", true);
+      if (error) throw error;
+      return count ?? 0;
+    },
+    enabled: !!departmentCode,
+  });
+
+  const reserveMutation = useMutation({
+    mutationFn: async () => {
+      const imageUrl = commerce.logo_url || commerce.photo_url;
+      if (!imageUrl) {
+        throw new Error(
+          "Ajoutez d'abord une photo ou un logo à votre fiche (onglet Mon Profil) avant de réserver une bannière.",
+        );
+      }
+      if (!villeQuery.data) throw new Error("Ville introuvable.");
+      const { error } = await supabase.from("banners").insert({
+        city_slug: villeQuery.data.slug,
+        image_url: imageUrl,
+        target_url: commerce.site_actif ? `/site/${commerce.slug}` : `/commerce/${commerce.slug}`,
+        position,
+        active: true,
+        commerce_id: commerce.id,
+        ...(departmentCode ? { target_departments: [departmentCode] } : {}),
+      });
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["banner-reservations", commerce.id] });
+      queryClient.invalidateQueries({ queryKey: ["banner-active-count", departmentCode] });
+      toast.success("Bannière réservée — visible dès maintenant sur la Marketplace.");
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("banners").delete().eq("id", id);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["banner-reservations", commerce.id] });
+      queryClient.invalidateQueries({ queryKey: ["banner-active-count", departmentCode] });
+      toast.success("Réservation annulée.");
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const loading = villeQuery.isLoading || zonesQuery.isLoading || reservationsQuery.isLoading;
+  const zone = (zonesQuery.data ?? []).find((z) => z.department_code === departmentCode) ?? null;
+  const inZone = !!departmentCode && !!zone;
+  const reservations = reservationsQuery.data ?? [];
+  const capacityReached =
+    inZone && (activeInDepartmentQuery.data ?? 0) >= (zone?.max_active_banners ?? 0);
+
+  return (
+    <article className="surface-card p-5">
+      <div className="flex items-center gap-2">
+        <Megaphone className="h-5 w-5 shrink-0 text-navy" />
+        <h2 className="font-display text-lg font-extrabold text-foreground">
+          Bannière publicitaire
+        </h2>
+      </div>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Affichez votre pub tout en haut ou tout en bas de la Marketplace de votre ville.
+      </p>
+
+      {loading ? (
+        <p className="mt-4 text-xs text-muted-foreground">Chargement…</p>
+      ) : !inZone ? (
+        <p className="mt-4 flex items-start gap-2 rounded-xl bg-secondary p-3 text-xs text-muted-foreground">
+          <Ban className="mt-0.5 h-4 w-4 shrink-0 text-promo" />
+          Bannières indisponibles dans votre département
+          {departmentCode ? ` (${departmentCode})` : ""}. Zone couverte actuellement :{" "}
+          {(zonesQuery.data ?? []).map((z) => z.department_code).join(", ") || "aucune"}.
+        </p>
+      ) : (
+        <div className="mt-4 space-y-3">
+          {reservations.map((r) => (
+            <div
+              key={r.id}
+              className="flex items-center justify-between gap-2 rounded-xl border border-border bg-card px-3 py-2.5"
+            >
+              <span className="text-xs font-semibold text-foreground">
+                {r.position === "top" ? "Bannière du haut" : "Bannière du bas"} —{" "}
+                {r.active ? "active" : "inactive"}
+              </span>
+              <button
+                type="button"
+                onClick={() => cancelMutation.mutate(r.id)}
+                disabled={cancelMutation.isPending}
+                className="shrink-0 text-xs font-semibold text-promo hover:underline disabled:opacity-60"
+              >
+                Annuler
+              </button>
+            </div>
+          ))}
+
+          <div className="flex flex-wrap gap-2">
+            {(["top", "bottom"] as const).map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setPosition(p)}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  position === p
+                    ? "border-transparent bg-navy text-primary-foreground"
+                    : "border-border bg-card text-foreground hover:bg-secondary"
+                }`}
+              >
+                {p === "top" ? "Haut de page" : "Bas de page"}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            disabled={reserveMutation.isPending}
+            onClick={() => reserveMutation.mutate()}
+            className="w-full rounded-xl border border-input bg-card py-3 text-sm font-bold text-foreground hover:bg-secondary disabled:opacity-60"
+          >
+            {reserveMutation.isPending ? "Réservation…" : "Réserver gratuitement (mode démo)"}
+          </button>
+        </div>
+      )}
+    </article>
+  );
+}
+
 function OptionsScreen({
   commerce,
+  accountType,
   pending,
   onActivateSite,
   onActivateBoost,
 }: {
   commerce: Commerce;
+  accountType: AccountType;
   pending: boolean;
   onActivateSite: () => void;
   onActivateBoost: () => void;
@@ -1580,6 +1976,8 @@ function OptionsScreen({
           </div>
         )}
       </article>
+
+      {accountType === "pro" ? <BannerReservationCard commerce={commerce} /> : null}
 
       <article className="surface-card p-5">
         <div className="flex items-center gap-2">

@@ -1,12 +1,14 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Phone, Navigation, Clock, MapPin, CalendarDays, Instagram, Package } from "lucide-react";
 import { BackButton } from "@/components/BackButton";
 import { GoogleRatingStars } from "@/components/GoogleRatingStars";
+import { CouponButton } from "@/components/CouponButton";
 import { supabase } from "@/lib/supabase";
 import { computeOpenStatus, type Horaire } from "@/lib/horaires";
 import { getReadableTextColor } from "@/lib/color";
 import { THEME_STYLES, type ThemeVisuel } from "@/lib/site-theme";
+import { logStatEvent, isFromGoogleReferrer } from "@/lib/stats-tracking";
 
 type SiteCommerce = {
   id: string;
@@ -155,6 +157,12 @@ function DescriptionBlock({ text, mutedClass }: { text: string; mutedClass: stri
 
 function StandaloneSite() {
   const { commerce, promos, event, produits } = Route.useLoaderData();
+
+  useEffect(() => {
+    if (!commerce.site_actif) return;
+    void logStatEvent(commerce.id, "app_view");
+    if (isFromGoogleReferrer()) void logStatEvent(commerce.id, "google_view");
+  }, [commerce.id, commerce.site_actif]);
 
   if (!commerce.site_actif) {
     return (
@@ -367,6 +375,7 @@ function StandaloneSite() {
                           ) : null}
                         </div>
                       ) : null}
+                      <CouponButton commerceId={commerce.id} compact className="shrink-0" />
                     </div>
                   ))}
                 </div>
