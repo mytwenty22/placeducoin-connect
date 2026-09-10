@@ -20,11 +20,18 @@ async function requireAdmin(admin: ReturnType<typeof getSupabaseAdmin>, accessTo
   }
 }
 
+const departmentCodeSchema = z
+  .string()
+  .trim()
+  .regex(/^(0[1-9]|[1-8][0-9]|9[0-5]|2[ab]|97[1-6])$/i, "Code département invalide (ex : 74, 2A, 971).")
+  .transform((value) => value.toUpperCase());
+
 const createMairieAccountSchema = z.object({
   accessToken: z.string().min(1),
   email: z.string().email(),
   password: z.string().min(8),
   villeNom: z.string().min(1),
+  departmentCode: departmentCodeSchema,
 });
 
 export const createMairieAccount = createServerFn({ method: "POST" })
@@ -36,7 +43,7 @@ export const createMairieAccount = createServerFn({ method: "POST" })
     const villeNom = data.villeNom.trim();
     const { data: existingVille } = await admin
       .from("villes")
-      .select("id")
+      .select("id, department_code")
       .ilike("nom", villeNom)
       .maybeSingle();
 
@@ -44,11 +51,17 @@ export const createMairieAccount = createServerFn({ method: "POST" })
     if (!villeId) {
       const { data: newVille, error: villeError } = await admin
         .from("villes")
-        .insert({ nom: villeNom, slug: slugify(villeNom) })
+        .insert({ nom: villeNom, slug: slugify(villeNom), department_code: data.departmentCode })
         .select("id")
         .single();
       if (villeError) throw new Error(villeError.message);
       villeId = newVille.id;
+    } else if (!existingVille?.department_code) {
+      const { error: updateError } = await admin
+        .from("villes")
+        .update({ department_code: data.departmentCode })
+        .eq("id", villeId);
+      if (updateError) throw new Error(updateError.message);
     }
 
     const { data: newUser, error: createError } = await admin.auth.admin.createUser({
@@ -85,7 +98,7 @@ export const listMairieAccounts = createServerFn({ method: "POST" })
 
     const { data: profiles, error } = await admin
       .from("profiles")
-      .select("id, created_at, villes(nom)")
+      .select("id, created_at, villes(nom, department_code)")
       .eq("role", "mairie")
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
@@ -93,12 +106,16 @@ export const listMairieAccounts = createServerFn({ method: "POST" })
     const accounts = await Promise.all(
       (profiles ?? []).map(async (profile) => {
         const { data: userData } = await admin.auth.admin.getUserById(profile.id);
-        const villes = profile.villes as unknown as { nom: string }[] | { nom: string } | null;
-        const villeNom = Array.isArray(villes) ? villes[0]?.nom : villes?.nom;
+        const villes = profile.villes as unknown as
+          | { nom: string; department_code: string | null }[]
+          | { nom: string; department_code: string | null }
+          | null;
+        const ville = Array.isArray(villes) ? villes[0] : villes;
         return {
           id: profile.id,
           email: userData.user?.email ?? "—",
-          villeNom: villeNom ?? "—",
+          villeNom: ville?.nom ?? "—",
+          departmentCode: ville?.department_code ?? null,
           createdAt: profile.created_at as string,
         };
       }),

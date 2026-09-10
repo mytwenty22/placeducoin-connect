@@ -98,7 +98,12 @@ function AdminDashboard({ userId }: { userId: string }) {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (input: { email: string; password: string; villeNom: string }) => {
+    mutationFn: async (input: {
+      email: string;
+      password: string;
+      villeNom: string;
+      departmentCode: string;
+    }) => {
       const { data } = await supabase.auth.getSession();
       const accessToken = data.session?.access_token;
       if (!accessToken) throw new Error("Session invalide.");
@@ -180,7 +185,10 @@ function AdminDashboard({ userId }: { userId: string }) {
             >
               <div>
                 <p className="font-semibold text-foreground">{account.email}</p>
-                <p className="text-xs text-muted-foreground">{account.villeNom}</p>
+                <p className="text-xs text-muted-foreground">
+                  {account.villeNom}
+                  {account.departmentCode ? ` (${account.departmentCode})` : " — département manquant"}
+                </p>
               </div>
               <p className="text-xs text-muted-foreground">
                 {new Date(account.createdAt).toLocaleDateString("fr-FR")}
@@ -193,27 +201,37 @@ function AdminDashboard({ userId }: { userId: string }) {
   );
 }
 
+const DEPARTMENT_CODE_PATTERN = /^(0[1-9]|[1-8][0-9]|9[0-5]|2[ab]|97[1-6])$/i;
+
 function CreateMairieAccountForm({
   onCreate,
   pending,
 }: {
-  onCreate: (input: { email: string; password: string; villeNom: string }) => void;
+  onCreate: (input: {
+    email: string;
+    password: string;
+    villeNom: string;
+    departmentCode: string;
+  }) => void;
   pending: boolean;
 }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [villeNom, setVilleNom] = useState("");
+  const [departmentCode, setDepartmentCode] = useState("");
+  const isDepartmentCodeValid = DEPARTMENT_CODE_PATTERN.test(departmentCode.trim());
 
   return (
     <form
       className="surface-card space-y-4 p-5"
       onSubmit={(e) => {
         e.preventDefault();
-        if (!email.trim() || !password.trim() || !villeNom.trim()) return;
-        onCreate({ email, password, villeNom });
+        if (!email.trim() || !password.trim() || !villeNom.trim() || !isDepartmentCodeValid) return;
+        onCreate({ email, password, villeNom, departmentCode: departmentCode.trim().toUpperCase() });
         setEmail("");
         setPassword("");
         setVilleNom("");
+        setDepartmentCode("");
       }}
     >
       <div className="flex items-center gap-2">
@@ -236,6 +254,27 @@ function CreateMairieAccountForm({
         <span className="mt-1 block text-xs text-muted-foreground">
           Si la commune n'existe pas encore, elle est créée automatiquement.
         </span>
+      </label>
+
+      <label className="block">
+        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Département
+        </span>
+        <input
+          value={departmentCode}
+          onChange={(e) => setDepartmentCode(e.target.value)}
+          placeholder="Ex : 74"
+          className="mt-1 w-full rounded-xl border border-input bg-card px-3 py-2.5 text-sm outline-none focus:border-navy"
+        />
+        <span className="mt-1 block text-xs text-muted-foreground">
+          Code département (01-95, 2A, 2B, 971-976). Sert au filtre géographique des bannières
+          publicitaires — si la commune existe déjà sans département renseigné, il sera complété.
+        </span>
+        {departmentCode.trim() && !isDepartmentCodeValid ? (
+          <span className="mt-1 block text-xs font-semibold text-destructive">
+            Code département invalide.
+          </span>
+        ) : null}
       </label>
 
       <label className="block">
