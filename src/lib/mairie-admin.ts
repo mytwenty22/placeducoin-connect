@@ -23,7 +23,10 @@ async function requireAdmin(admin: ReturnType<typeof getSupabaseAdmin>, accessTo
 const departmentCodeSchema = z
   .string()
   .trim()
-  .regex(/^(0[1-9]|[1-8][0-9]|9[0-5]|2[ab]|97[1-6])$/i, "Code département invalide (ex : 74, 2A, 971).")
+  .regex(
+    /^(0[1-9]|[1-8][0-9]|9[0-5]|2[ab]|97[1-6])$/i,
+    "Code département invalide (ex : 74, 2A, 971).",
+  )
   .transform((value) => value.toUpperCase());
 
 const createMairieAccountSchema = z.object({

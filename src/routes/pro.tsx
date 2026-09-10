@@ -1989,8 +1989,8 @@ function OptionsScreen({
           </div>
           <p className="mt-2 text-sm text-muted-foreground">
             Envoie une notification de test, comme si votre commerce venait d'être détecté En
-            Vedette près d'un client. Ouvrez la marketplace dans un autre onglet pour voir la
-            cloche se mettre à jour en direct.
+            Vedette près d'un client. Ouvrez la marketplace dans un autre onglet pour voir la cloche
+            se mettre à jour en direct.
           </p>
           <button
             type="button"

@@ -187,7 +187,9 @@ function AdminDashboard({ userId }: { userId: string }) {
                 <p className="font-semibold text-foreground">{account.email}</p>
                 <p className="text-xs text-muted-foreground">
                   {account.villeNom}
-                  {account.departmentCode ? ` (${account.departmentCode})` : " — département manquant"}
+                  {account.departmentCode
+                    ? ` (${account.departmentCode})`
+                    : " — département manquant"}
                 </p>
               </div>
               <p className="text-xs text-muted-foreground">
@@ -227,7 +229,12 @@ function CreateMairieAccountForm({
       onSubmit={(e) => {
         e.preventDefault();
         if (!email.trim() || !password.trim() || !villeNom.trim() || !isDepartmentCodeValid) return;
-        onCreate({ email, password, villeNom, departmentCode: departmentCode.trim().toUpperCase() });
+        onCreate({
+          email,
+          password,
+          villeNom,
+          departmentCode: departmentCode.trim().toUpperCase(),
+        });
         setEmail("");
         setPassword("");
         setVilleNom("");
