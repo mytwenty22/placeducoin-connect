@@ -1590,10 +1590,10 @@ function PromoScreen({
                       <CheckCircle2 className="h-4 w-4" />
                     </button>
                   ) : null}
-                  {!expired && p.kind !== "evenement" ? (
+                  {import.meta.env.DEV && !expired && p.kind !== "evenement" ? (
                     <button
                       type="button"
-                      title="Simuler expiration 24h"
+                      title="Simuler expiration 24h (dev uniquement)"
                       aria-label={`Simuler l'expiration de ${p.titre}`}
                       onClick={() => expireMutation.mutate(p.id)}
                       disabled={expireMutation.isPending}
@@ -1979,36 +1979,38 @@ function OptionsScreen({
 
       {accountType === "pro" ? <BannerReservationCard commerce={commerce} /> : null}
 
-      <article className="surface-card p-5">
-        <div className="flex items-center gap-2">
-          <FlaskConical className="h-5 w-5 shrink-0 text-navy" />
-          <h2 className="font-display text-lg font-extrabold text-foreground">
-            Simuler une alerte Vedette
-          </h2>
-        </div>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Envoie une notification de test, comme si votre commerce venait d'être détecté En Vedette
-          près d'un client. Ouvrez la marketplace dans un autre onglet pour voir la cloche se mettre
-          à jour en direct.
-        </p>
-        <button
-          type="button"
-          onClick={() => {
-            addNotification({
-              title: `Offre en vedette près de vous : ${commerce.nom}`,
-              body: `${commerce.trade} — nouvelle offre sponsorisée (test)`,
-              category: commerce.category,
-              shop: commerce.nom,
-              slug: commerce.slug,
-              distanceKm: Math.round((0.3 + Math.random() * 1.7) * 10) / 10,
-            });
-            toast.success("Alerte de test envoyée au centre de notifications.");
-          }}
-          className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-input bg-card py-3 text-sm font-bold text-foreground hover:bg-secondary"
-        >
-          <FlaskConical className="h-4 w-4" /> Simuler l'envoi d'une alerte Vedette
-        </button>
-      </article>
+      {import.meta.env.DEV ? (
+        <article className="surface-card p-5">
+          <div className="flex items-center gap-2">
+            <FlaskConical className="h-5 w-5 shrink-0 text-navy" />
+            <h2 className="font-display text-lg font-extrabold text-foreground">
+              Simuler une alerte Vedette (dev uniquement)
+            </h2>
+          </div>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Envoie une notification de test, comme si votre commerce venait d'être détecté En
+            Vedette près d'un client. Ouvrez la marketplace dans un autre onglet pour voir la
+            cloche se mettre à jour en direct.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              addNotification({
+                title: `Offre en vedette près de vous : ${commerce.nom}`,
+                body: `${commerce.trade} — nouvelle offre sponsorisée (test)`,
+                category: commerce.category,
+                shop: commerce.nom,
+                slug: commerce.slug,
+                distanceKm: Math.round((0.3 + Math.random() * 1.7) * 10) / 10,
+              });
+              toast.success("Alerte de test envoyée au centre de notifications.");
+            }}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-input bg-card py-3 text-sm font-bold text-foreground hover:bg-secondary"
+          >
+            <FlaskConical className="h-4 w-4" /> Simuler l'envoi d'une alerte Vedette
+          </button>
+        </article>
+      ) : null}
 
       <p className="text-center text-xs text-muted-foreground">
         Mode démo — aucun paiement réel n'est effectué. L'activation gratuite, elle, est bien

@@ -7,12 +7,13 @@ import { CouponButton } from "@/components/CouponButton";
 import { getOffer, type CategoryKey, type Offer } from "@/lib/placeducoin-data";
 import { supabase } from "@/lib/supabase";
 import { logStatEvent, isFromGoogleReferrer } from "@/lib/stats-tracking";
+import type { Horaire } from "@/lib/horaires";
 
 async function loadRealOffer(slug: string): Promise<Offer | null> {
   const { data: commerce } = await supabase
     .from("commerces")
     .select(
-      "id, nom, trade, category, adresse, telephone, photo_url, site_actif, google_rating, google_review_count, villes(nom)",
+      "id, nom, trade, category, adresse, telephone, photo_url, site_actif, google_rating, google_review_count, horaires, villes(nom)",
     )
     .eq("slug", slug)
     .maybeSingle();
@@ -51,7 +52,10 @@ async function loadRealOffer(slug: string): Promise<Offer | null> {
     sponsored: false,
     address: commerce.adresse ?? "",
     phone: commerce.telephone ?? "",
-    hours: [],
+    hours: ((commerce.horaires as Horaire[] | null) ?? []).map((h) => ({
+      day: h.jour,
+      value: h.valeur,
+    })),
     services: [],
     premium: commerce.site_actif,
     ...(photoUrl ? { photoUrl } : {}),
