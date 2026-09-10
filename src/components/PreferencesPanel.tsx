@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Settings, BellRing, BellOff, MailCheck } from "lucide-react";
 import {
@@ -12,6 +13,13 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { CATEGORIES, type CategoryKey } from "@/lib/placeducoin-data";
 import { useUserPrefs } from "@/lib/user-prefs";
 import { supabase } from "@/lib/supabase";
@@ -20,24 +28,42 @@ const PREFERENCE_CATEGORIES = CATEGORIES.filter((c) => c.key !== "locale");
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_RE = /^[0-9+()\s.-]{6,}$/;
 
-function detectContactType(value: string): "email" | "phone" | null {
-  const trimmed = value.trim();
-  if (EMAIL_RE.test(trimmed)) return "email";
-  if (PHONE_RE.test(trimmed) && /\d{6,}/.test(trimmed.replace(/\D/g, ""))) return "phone";
-  return null;
-}
-
 export function PreferencesPanel() {
   const [open, setOpen] = useState(false);
   const { favoriteCategories, toggleCategory, pushPermission, requestPushPermission } =
     useUserPrefs();
-  const [contact, setContact] = useState("");
+  const [nom, setNom] = useState("");
+  const [email, setEmail] = useState("");
+  const [telephone, setTelephone] = useState("");
+  const [villeId, setVilleId] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const saveAlertContact = async () => {
-    const contactType = detectContactType(contact);
-    if (!contactType) {
-      toast.error("Entre un numéro de téléphone ou un e-mail valide.");
+  const villesQuery = useQuery({
+    queryKey: ["villes-signup"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("villes").select("id, nom").order("nom");
+      if (error) throw error;
+      return data as { id: string; nom: string }[];
+    },
+    enabled: open,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const saveSignup = async () => {
+    if (!nom.trim()) {
+      toast.error("Entre ton nom.");
+      return;
+    }
+    if (!EMAIL_RE.test(email.trim())) {
+      toast.error("Entre un e-mail valide.");
+      return;
+    }
+    if (telephone.trim() && !PHONE_RE.test(telephone.trim())) {
+      toast.error("Le numéro de téléphone n'est pas valide.");
+      return;
+    }
+    if (!villeId) {
+      toast.error("Choisis ta commune.");
       return;
     }
 
@@ -48,8 +74,10 @@ export function PreferencesPanel() {
 
     setSaving(true);
     const { error } = await supabase.from("alert_subscriptions").insert({
-      contact: contact.trim(),
-      contact_type: contactType,
+      nom: nom.trim(),
+      email: email.trim(),
+      telephone: telephone.trim() || null,
+      ville_id: villeId,
       categories,
     });
     setSaving(false);
@@ -59,7 +87,10 @@ export function PreferencesPanel() {
       return;
     }
     toast.success("C'est noté, tu recevras les alertes des commerces et de la mairie.");
-    setContact("");
+    setNom("");
+    setEmail("");
+    setTelephone("");
+    setVilleId("");
   };
 
   return (
@@ -102,28 +133,55 @@ export function PreferencesPanel() {
         </div>
 
         <div className="mt-6 border-t border-border pt-4">
-          <h3 className="text-sm font-semibold text-foreground">Alertes par SMS ou e-mail</h3>
+          <h3 className="text-sm font-semibold text-foreground">Inscription aux alertes</h3>
           <p className="mt-1 text-xs text-muted-foreground">
-            Reçois les alertes des commerces et de la mairie pour les catégories choisies ci-dessus,
-            même hors ligne.
+            Reçois les alertes des commerces et de la mairie de ta commune pour les catégories
+            choisies ci-dessus, même hors ligne.
           </p>
           <form
-            className="mt-3 flex items-center gap-2"
+            className="mt-3 space-y-2.5"
             onSubmit={(e) => {
               e.preventDefault();
-              void saveAlertContact();
+              void saveSignup();
             }}
           >
             <Input
               type="text"
-              inputMode="email"
-              placeholder="06 12 34 56 78 ou vous@exemple.fr"
-              value={contact}
-              onChange={(e) => setContact(e.target.value)}
+              placeholder="Nom"
+              value={nom}
+              onChange={(e) => setNom(e.target.value)}
               disabled={saving}
-              aria-label="Numéro de téléphone ou e-mail"
+              aria-label="Nom"
             />
-            <Button type="submit" size="sm" disabled={saving || contact.trim().length === 0}>
+            <Input
+              type="email"
+              placeholder="vous@exemple.fr"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={saving}
+              aria-label="E-mail"
+            />
+            <Input
+              type="tel"
+              placeholder="06 12 34 56 78 (optionnel)"
+              value={telephone}
+              onChange={(e) => setTelephone(e.target.value)}
+              disabled={saving}
+              aria-label="Téléphone"
+            />
+            <Select value={villeId} onValueChange={setVilleId} disabled={saving}>
+              <SelectTrigger aria-label="Commune">
+                <SelectValue placeholder="Ta commune" />
+              </SelectTrigger>
+              <SelectContent>
+                {villesQuery.data?.map((v) => (
+                  <SelectItem key={v.id} value={v.id}>
+                    {v.nom}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button type="submit" size="sm" className="w-full" disabled={saving}>
               <MailCheck className="h-3.5 w-3.5" /> Enregistrer
             </Button>
           </form>
