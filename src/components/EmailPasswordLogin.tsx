@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
+import { getSiteUrl } from "@/lib/site-url";
 
 export function EmailPasswordLogin({
   heading,
@@ -77,7 +78,7 @@ export function EmailPasswordLogin({
             }
             setResetting(true);
             const { error } = await supabase.auth.resetPasswordForEmail(email, {
-              redirectTo: `${window.location.origin}/reset-password`,
+              redirectTo: `${getSiteUrl()}/reset-password`,
             });
             setResetting(false);
             if (error) {

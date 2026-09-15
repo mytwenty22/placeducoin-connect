@@ -9,6 +9,7 @@ import { EmailPasswordLogin } from "@/components/EmailPasswordLogin";
 import { supabase } from "@/lib/supabase";
 import { createMairieAccount, listMairieAccounts } from "@/lib/mairie-admin";
 import { listProAccounts } from "@/lib/pro-admin";
+import { getSiteUrl } from "@/lib/site-url";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -112,7 +113,7 @@ function AdminDashboard({ userId }: { userId: string }) {
   const sendResetMutation = useMutation({
     mutationFn: async (email: string) => {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: `${getSiteUrl()}/reset-password`,
       });
       if (error) throw error;
     },
