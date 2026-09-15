@@ -3,11 +3,12 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { Session } from "@supabase/supabase-js";
-import { LogOut, ShieldCheck, UserPlus } from "lucide-react";
+import { KeyRound, LogOut, ShieldCheck, UserPlus } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { EmailPasswordLogin } from "@/components/EmailPasswordLogin";
 import { supabase } from "@/lib/supabase";
 import { createMairieAccount, listMairieAccounts } from "@/lib/mairie-admin";
+import { listProAccounts } from "@/lib/pro-admin";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -95,6 +96,28 @@ function AdminDashboard({ userId }: { userId: string }) {
       return listMairieAccounts({ data: { accessToken } });
     },
     enabled: profileQuery.data?.role === "admin",
+  });
+
+  const proAccountsQuery = useQuery({
+    queryKey: ["pro-accounts"],
+    queryFn: async () => {
+      const { data } = await supabase.auth.getSession();
+      const accessToken = data.session?.access_token;
+      if (!accessToken) throw new Error("Session invalide.");
+      return listProAccounts({ data: { accessToken } });
+    },
+    enabled: profileQuery.data?.role === "admin",
+  });
+
+  const sendResetMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => toast.success("Email de réinitialisation envoyé au commerçant."),
+    onError: (error: Error) => toast.error(error.message),
   });
 
   const createMutation = useMutation({
@@ -195,6 +218,43 @@ function AdminDashboard({ userId }: { userId: string }) {
               <p className="text-xs text-muted-foreground">
                 {new Date(account.createdAt).toLocaleDateString("fr-FR")}
               </p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h2 className="font-display text-lg font-extrabold text-foreground">Comptes Commerçants</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Pour des raisons de sécurité, un admin ne peut pas définir directement le mot de passe
+          d'un commerçant. Envoyez-lui un lien de réinitialisation par email à la place.
+        </p>
+        <div className="mt-4 space-y-2">
+          {proAccountsQuery.isLoading ? (
+            <p className="text-sm text-muted-foreground">Chargement…</p>
+          ) : null}
+          {proAccountsQuery.data?.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Aucun compte Commerçant pour le moment.</p>
+          ) : null}
+          {proAccountsQuery.data?.map((account) => (
+            <article
+              key={account.id}
+              className="surface-card flex items-center justify-between gap-3 p-3 text-sm"
+            >
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-foreground">{account.commerceNom}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {account.email} — {account.villeNom}
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={sendResetMutation.isPending}
+                onClick={() => sendResetMutation.mutate(account.email)}
+                className="flex shrink-0 items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary/70 disabled:opacity-60"
+              >
+                <KeyRound className="h-3.5 w-3.5" /> Réinitialiser le mot de passe
+              </button>
             </article>
           ))}
         </div>
