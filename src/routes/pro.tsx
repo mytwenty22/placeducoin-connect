@@ -1789,35 +1789,60 @@ function StatsScreen({ commerceId }: { commerceId: string }) {
   );
 }
 
+type BannerTierKey = "test" | "standard" | "exclusif";
+
 type BannerReservation = {
   id: string;
   position: "top" | "bottom";
   active: boolean;
   city_slug: string;
+  tier: BannerTierKey;
+  starts_at: string;
   expires_at: string | null;
 };
 
 type BannerZone = { department_code: string; max_active_banners: number };
 
-const BANNER_DURATIONS = [
-  { key: "1w", label: "1 semaine", days: 7 },
-  { key: "2w", label: "2 semaines", days: 14 },
-  { key: "1m", label: "1 mois", days: 30 },
-  { key: "3m", label: "3 mois", days: 90 },
-] as const;
-type BannerDurationKey = (typeof BANNER_DURATIONS)[number]["key"];
+// Grille tarifaire unique, identique en Haut et en Bas de page.
+const BANNER_TIERS: { key: BannerTierKey; label: string; price: number }[] = [
+  { key: "test", label: "7 jours (Test)", price: 29 },
+  { key: "standard", label: "1 mois (Standard)", price: 99 },
+  { key: "exclusif", label: "1 mois (Sponsor Exclusif)", price: 249 },
+];
 
-// Même tarif neutre quel que soit le statut Pro/gratuit du commerce -- l'accès à la bannière ne
-// dépend pas de l'abonnement Site Pro. Fourchette 50-300 € en haut, 40-250 € en bas.
-const BANNER_PRICES: Record<"top" | "bottom", Record<BannerDurationKey, number>> = {
-  top: { "1w": 50, "2w": 90, "1m": 150, "3m": 300 },
-  bottom: { "1w": 40, "2w": 75, "1m": 120, "3m": 250 },
-};
+function monthOptions(count: number) {
+  const now = new Date();
+  return Array.from({ length: count }, (_, i) => {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + i, 1));
+    const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+    const label = d.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+    return { key, label };
+  });
+}
+const MONTH_OPTIONS = monthOptions(6);
+
+// Fenêtre de diffusion réelle d'une réservation : le Test démarre immédiatement pour 7 jours : les
+// formules mensuelles démarrent le 1er du mois choisi (jusqu'à 6 mois à l'avance) et courent
+// jusqu'au 1er du mois suivant.
+function bannerWindow(tier: BannerTierKey, monthKey: string): { start: Date; end: Date } {
+  if (tier === "test") {
+    const start = new Date();
+    return { start, end: new Date(start.getTime() + 7 * 24 * 3600 * 1000) };
+  }
+  const [yearStr, monthStr] = monthKey.split("-");
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  return {
+    start: new Date(Date.UTC(year, month - 1, 1)),
+    end: new Date(Date.UTC(year, month, 1)),
+  };
+}
 
 function BannerReservationCard({ commerce }: { commerce: Commerce }) {
   const queryClient = useQueryClient();
-  const [duration, setDuration] = useState<BannerDurationKey>("1w");
   const [position, setPosition] = useState<"top" | "bottom">("top");
+  const [tier, setTier] = useState<BannerTierKey>("test");
+  const [monthKey, setMonthKey] = useState<string>(MONTH_OPTIONS[0]!.key);
 
   const villeQuery = useQuery({
     queryKey: ["ville", commerce.ville_id],
@@ -1848,7 +1873,7 @@ function BannerReservationCard({ commerce }: { commerce: Commerce }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("banners")
-        .select("id, position, active, city_slug, expires_at")
+        .select("id, position, active, city_slug, tier, starts_at, expires_at")
         .eq("commerce_id", commerce.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -1857,12 +1882,20 @@ function BannerReservationCard({ commerce }: { commerce: Commerce }) {
   });
 
   const departmentCode = villeQuery.data?.department_code ?? null;
+  const { start: windowStart, end: windowEnd } = bannerWindow(tier, monthKey);
 
-  // How many other active banners already run in this département — checked client-side against
-  // max_active_banners for a clear message; the RLS insert policy is what actually enforces the
-  // zone restriction (a business outside 33/47 can never insert regardless of this UI check).
-  const activeInDepartmentQuery = useQuery({
-    queryKey: ["banner-active-count", departmentCode],
+  // Quota strictement séparé Haut/Bas et par mois -- réserver "Bas de page" ne doit jamais être
+  // bloqué par le quota du "Haut de page", ni par un autre mois que celui visé. Un Sponsor
+  // Exclusif actif sur la fenêtre occupe la totalité des places (100% visibilité) ; sinon, chaque
+  // réservation Test/Standard actives sur la fenêtre compte pour une place parmi max_active_banners.
+  const capacityQuery = useQuery({
+    queryKey: [
+      "banner-active-count",
+      departmentCode,
+      position,
+      windowStart.toISOString(),
+      windowEnd.toISOString(),
+    ],
     queryFn: async () => {
       const { data: villesInDept, error: villesError } = await supabase
         .from("villes")
@@ -1870,14 +1903,19 @@ function BannerReservationCard({ commerce }: { commerce: Commerce }) {
         .eq("department_code", departmentCode as string);
       if (villesError) throw villesError;
       const slugs = (villesInDept ?? []).map((v) => v.slug);
-      if (slugs.length === 0) return 0;
-      const { count, error } = await supabase
+      if (slugs.length === 0) return { used: 0, hasExclusive: false };
+      const { data, error } = await supabase
         .from("banners")
-        .select("id", { count: "exact", head: true })
+        .select("tier")
         .in("city_slug", slugs)
-        .eq("active", true);
+        .eq("position", position)
+        .eq("active", true)
+        .lt("starts_at", windowEnd.toISOString())
+        .or(`expires_at.is.null,expires_at.gt.${windowStart.toISOString()}`);
       if (error) throw error;
-      return count ?? 0;
+      const rows = data ?? [];
+      const hasExclusive = rows.some((r) => r.tier === "exclusif");
+      return { used: hasExclusive ? Infinity : rows.length, hasExclusive };
     },
     enabled: !!departmentCode,
   });
@@ -1891,17 +1929,21 @@ function BannerReservationCard({ commerce }: { commerce: Commerce }) {
         );
       }
       if (!villeQuery.data) throw new Error("Ville introuvable.");
-      const days = BANNER_DURATIONS.find((d) => d.key === duration)?.days ?? 7;
-      // Une réservation remplace la précédente pour le même emplacement plutôt que de s'empiler
-      // à côté : sans ça, chaque nouveau clic laissait l'ancienne bannière active pour toujours
-      // (jamais affichée -- seule la plus récente l'est -- mais comptant quand même dans le quota
-      // de la zone).
-      const { error: deleteError } = await supabase
+      const { start, end } = bannerWindow(tier, monthKey);
+      // Empêche un double-clic de créer un doublon pour la même fenêtre (même position + même
+      // date de début), sans toucher aux réservations sur d'autres mois : une réservation à
+      // l'avance doit pouvoir coexister avec les réservations en cours. Le Test n'a pas de
+      // fenêtre stable (il démarre "maintenant" à chaque clic) : on désactive plutôt tout Test
+      // actif existant sur cette position.
+      const dedup = supabase
         .from("banners")
         .delete()
         .eq("commerce_id", commerce.id)
-        .eq("position", position)
-        .eq("active", true);
+        .eq("position", position);
+      const { error: deleteError } =
+        tier === "test"
+          ? await dedup.eq("tier", "test").eq("active", true)
+          : await dedup.eq("starts_at", start.toISOString());
       if (deleteError) throw new Error(deleteError.message);
       const { error } = await supabase.from("banners").insert({
         city_slug: villeQuery.data.slug,
@@ -1910,7 +1952,9 @@ function BannerReservationCard({ commerce }: { commerce: Commerce }) {
         position,
         active: true,
         commerce_id: commerce.id,
-        expires_at: new Date(Date.now() + days * 24 * 3600 * 1000).toISOString(),
+        tier,
+        starts_at: start.toISOString(),
+        expires_at: end.toISOString(),
         ...(departmentCode ? { target_departments: [departmentCode] } : {}),
       });
       if (error) throw new Error(error.message);
@@ -1918,20 +1962,22 @@ function BannerReservationCard({ commerce }: { commerce: Commerce }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["banner-reservations", commerce.id] });
       queryClient.invalidateQueries({ queryKey: ["banner-active-count", departmentCode] });
-      toast.success("Bannière réservée — visible dès maintenant sur la Marketplace.");
+      toast.success("Bannière réservée.");
     },
     onError: (error: Error) => toast.error(error.message),
   });
 
   const cancelMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("banners").delete().eq("id", id);
+      const { error } = await supabase.from("banners").update({ active: false }).eq("id", id);
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
+      // Invalide au sens large (préfixe de clé) pour que la place se libère immédiatement dans
+      // toutes les combinaisons position/mois déjà chargées, sans rafraîchissement manuel.
       queryClient.invalidateQueries({ queryKey: ["banner-reservations", commerce.id] });
       queryClient.invalidateQueries({ queryKey: ["banner-active-count", departmentCode] });
-      toast.success("Réservation annulée.");
+      toast.success("Réservation annulée — la place est immédiatement libérée.");
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -1940,8 +1986,13 @@ function BannerReservationCard({ commerce }: { commerce: Commerce }) {
   const zone = (zonesQuery.data ?? []).find((z) => z.department_code === departmentCode) ?? null;
   const inZone = !!departmentCode && !!zone;
   const reservations = reservationsQuery.data ?? [];
-  const capacityReached =
-    inZone && (activeInDepartmentQuery.data ?? 0) >= (zone?.max_active_banners ?? 0);
+  const maxSlots = zone?.max_active_banners ?? 5;
+  const used = capacityQuery.data?.used ?? 0;
+  const availableSlots = Math.max(0, maxSlots - Math.min(used, maxSlots));
+  // Le Sponsor Exclusif exige la fenêtre totalement libre (100% visibilité) ; les autres formules
+  // exigent juste qu'il reste une place et qu'aucun Exclusif ne l'occupe déjà.
+  const capacityReached = tier === "exclusif" ? used > 0 : availableSlots <= 0;
+  const price = BANNER_TIERS.find((t) => t.key === tier)?.price ?? 0;
 
   return (
     <article className="surface-card p-5">
@@ -1967,92 +2018,137 @@ function BannerReservationCard({ commerce }: { commerce: Commerce }) {
       ) : (
         <div className="mt-4 space-y-3">
           {reservations.map((r) => {
-            const expiresAt = r.expires_at ? new Date(r.expires_at) : null;
-            const expired = r.active && !!expiresAt && expiresAt.getTime() < Date.now();
+            const starts = new Date(r.starts_at);
+            const expires = r.expires_at ? new Date(r.expires_at) : null;
+            const now = Date.now();
+            const fmt = (d: Date) =>
+              d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+            const tierLabel = BANNER_TIERS.find((t) => t.key === r.tier)?.label ?? r.tier;
+            let status: string;
+            if (!r.active) status = "Annulée";
+            else if (expires && expires.getTime() < now) status = "Expirée";
+            else if (starts.getTime() > now) status = `Programmée dès le ${fmt(starts)}`;
+            else status = expires ? `Active jusqu'au ${fmt(expires)}` : "Active";
             return (
               <div
                 key={r.id}
                 className="flex items-center justify-between gap-2 rounded-xl border border-border bg-card px-3 py-2.5"
               >
                 <span className="text-xs font-semibold text-foreground">
-                  {r.position === "top" ? "Bannière du haut" : "Bannière du bas"} —{" "}
-                  {r.active && !expired ? "active" : "inactive"}
-                  {r.active && !expired && expiresAt
-                    ? ` (jusqu'au ${expiresAt.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })})`
-                    : ""}
+                  {r.position === "top" ? "Haut de page" : "Bas de page"} · {tierLabel} — {status}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => cancelMutation.mutate(r.id)}
-                  disabled={cancelMutation.isPending}
-                  className="shrink-0 text-xs font-semibold text-promo hover:underline disabled:opacity-60"
-                >
-                  Annuler
-                </button>
+                {r.active ? (
+                  <button
+                    type="button"
+                    onClick={() => cancelMutation.mutate(r.id)}
+                    disabled={cancelMutation.isPending}
+                    className="shrink-0 text-xs font-semibold text-promo hover:underline disabled:opacity-60"
+                  >
+                    Annuler
+                  </button>
+                ) : null}
               </div>
             );
           })}
 
-          <div className="flex flex-wrap gap-2">
-            {(["top", "bottom"] as const).map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setPosition(p)}
-                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                  position === p
-                    ? "border-transparent bg-navy text-primary-foreground"
-                    : "border-border bg-card text-foreground hover:bg-secondary"
-                }`}
-              >
-                {p === "top" ? "Haut de page" : "Bas de page"}
-              </button>
-            ))}
+          <div>
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Emplacement
+            </span>
+            <div className="mt-1.5 flex flex-wrap gap-2">
+              {(["top", "bottom"] as const).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setPosition(p)}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    position === p
+                      ? "border-transparent bg-navy text-primary-foreground"
+                      : "border-border bg-card text-foreground hover:bg-secondary"
+                  }`}
+                >
+                  {p === "top" ? "Haut de page" : "Bas de page"}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div>
             <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Durée
+              Formule
             </span>
             <div className="mt-1.5 flex flex-wrap gap-2">
-              {BANNER_DURATIONS.map((d) => (
+              {BANNER_TIERS.map((t) => (
                 <button
-                  key={d.key}
+                  key={t.key}
                   type="button"
-                  onClick={() => setDuration(d.key)}
+                  onClick={() => setTier(t.key)}
                   className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                    duration === d.key
+                    tier === t.key
                       ? "border-transparent bg-promo text-promo-foreground"
                       : "border-border bg-card text-foreground hover:bg-secondary"
                   }`}
                 >
-                  {d.label} · {BANNER_PRICES[position][d.key]} €
+                  {t.label} · {t.price} €
                 </button>
               ))}
             </div>
             <span className="mt-1 block text-xs text-muted-foreground">
+              {tier === "standard"
+                ? `Standard : max ${maxSlots} réservations actives par mois et par emplacement.`
+                : tier === "exclusif"
+                  ? "Sponsor Exclusif : 100% de la visibilité sur cet emplacement pendant le mois (aucune autre bannière ne peut être réservée en parallèle)."
+                  : "Essai courte durée, pour tester avant de s'engager sur un mois."}{" "}
               Même tarif que vous soyez abonné Site Pro ou en formule gratuite.
             </span>
           </div>
 
+          {tier !== "test" ? (
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Mois
+              </span>
+              <select
+                value={monthKey}
+                onChange={(e) => setMonthKey(e.target.value)}
+                className="mt-1.5 w-full rounded-xl border border-input bg-card px-3 py-2.5 text-sm text-foreground outline-none focus:border-navy"
+              >
+                {MONTH_OPTIONS.map((m) => (
+                  <option key={m.key} value={m.key}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+              <span className="mt-1 block text-xs text-muted-foreground">
+                Réservable jusqu'à 6 mois à l'avance — le compteur de places ci-dessous est propre à
+                chaque mois.
+              </span>
+            </div>
+          ) : null}
+
+          <p className="text-xs font-semibold text-foreground">
+            {tier === "exclusif"
+              ? used > 0
+                ? "Fenêtre déjà occupée — indisponible en Exclusif."
+                : `Fenêtre entièrement libre (${maxSlots}/${maxSlots} places) : Exclusif disponible.`
+              : `${availableSlots}/${maxSlots} places disponibles pour ${position === "top" ? "le Haut de page" : "le Bas de page"}${tier !== "test" ? ` en ${MONTH_OPTIONS.find((m) => m.key === monthKey)?.label}` : ""}.`}
+          </p>
+
           {capacityReached ? (
             <p className="flex items-start gap-2 rounded-xl bg-secondary p-3 text-xs text-muted-foreground">
               <Ban className="mt-0.5 h-4 w-4 shrink-0 text-promo" />
-              Capacité de bannières atteinte pour votre département ({zone?.max_active_banners}{" "}
-              max). Attendez qu'une place se libère ou contactez-nous.
+              {tier === "exclusif"
+                ? "Le Sponsor Exclusif exige que la fenêtre soit entièrement libre. Choisissez un autre mois, emplacement ou formule."
+                : "Capacité atteinte pour cet emplacement et ce mois. Attendez qu'une place se libère, choisissez un autre mois ou contactez-nous."}
             </p>
           ) : (
             <div className="space-y-2">
               <button
                 type="button"
-                onClick={() =>
-                  toast(
-                    `Paiement Stripe non configuré dans cette démo (${BANNER_PRICES[position][duration]} €).`,
-                  )
-                }
+                onClick={() => toast(`Paiement Stripe non configuré dans cette démo (${price} €).`)}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-promo py-3 text-sm font-bold text-promo-foreground"
               >
-                Payer {BANNER_PRICES[position][duration]} € via Stripe
+                Payer {price} € via Stripe
               </button>
               <button
                 type="button"
@@ -2060,9 +2156,7 @@ function BannerReservationCard({ commerce }: { commerce: Commerce }) {
                 onClick={() => reserveMutation.mutate()}
                 className="w-full rounded-xl border border-input bg-card py-3 text-sm font-bold text-foreground hover:bg-secondary disabled:opacity-60"
               >
-                {reserveMutation.isPending
-                  ? "Réservation…"
-                  : `Réserver gratuitement (mode démo) — ${BANNER_DURATIONS.find((d) => d.key === duration)?.label}`}
+                {reserveMutation.isPending ? "Réservation…" : "Réserver gratuitement (mode démo)"}
               </button>
             </div>
           )}
