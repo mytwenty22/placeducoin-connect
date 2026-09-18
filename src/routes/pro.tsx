@@ -2007,6 +2007,9 @@ function OptionsScreen({
 }) {
   const boostExpiresAt = commerce.boost_expires_at ? new Date(commerce.boost_expires_at) : null;
   const boostActive = isBoostActive(commerce);
+  // La section VIP "À la Une" n'accepte que les abonnés Site Pro qui cumulent le boost -- un
+  // commerce gratuit ne peut jamais y prétendre, quel que soit son statut Vedette.
+  const vipEligible = commerce.site_actif;
 
   return (
     <div className="space-y-4">
@@ -2063,17 +2066,29 @@ function OptionsScreen({
         <div className="flex items-center gap-2">
           <Zap className="h-5 w-5 shrink-0 text-promo" />
           <h2 className="font-display text-lg font-extrabold text-foreground">
-            Option B · 9 € pour 24h
+            {vipEligible ? "Booster à la Une · 9 € / 24h" : "Option Vedette · 9 € / 24h"}
           </h2>
         </div>
         <p className="mt-2 text-sm text-muted-foreground">
-          Mettez votre offre tout en haut de la marketplace pendant 24h, avec badge rouge « En
-          Vedette ». Cumulée avec l'Option A, votre fiche apparaît aussi dans l'encart « À la une ».
+          {vipEligible ? (
+            <>
+              Action distincte de la publication d'une promo : place votre fiche dans le carrousel
+              VIP « À la Une », juste sous la bannière du haut, pendant 24h — en plus du badge rouge
+              « En Vedette » en tête du fil standard.
+            </>
+          ) : (
+            <>
+              Fait remonter votre fiche en tête du fil standard pendant 24h, avec le badge rouge «
+              En Vedette ». Le carrousel VIP « À la Une » est réservé aux abonnés Site Pro (Option
+              A).
+            </>
+          )}
         </p>
         {boostActive ? (
           <div className="mt-4 space-y-2">
             <p className="flex items-center justify-center gap-2 rounded-xl bg-mairie py-3 text-sm font-bold text-mairie-foreground">
-              <Check className="h-4 w-4" /> Offre en vedette
+              <Check className="h-4 w-4" />
+              {vipEligible ? "En Vedette + À la Une" : "En Vedette"}
               {boostExpiresAt
                 ? ` — jusqu'au ${boostExpiresAt.toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`
                 : ""}
@@ -2084,7 +2099,11 @@ function OptionsScreen({
               onClick={onCancelBoost}
               className="w-full rounded-xl border border-input bg-card py-3 text-sm font-bold text-foreground hover:bg-secondary disabled:opacity-60"
             >
-              {cancelPending ? "Annulation…" : "Annuler l'option Vedette"}
+              {cancelPending
+                ? "Annulation…"
+                : vipEligible
+                  ? "Annuler le Boost À la Une"
+                  : "Annuler l'option Vedette"}
             </button>
           </div>
         ) : (
@@ -2094,7 +2113,7 @@ function OptionsScreen({
               onClick={() => toast("Paiement Stripe non configuré dans cette démo.")}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-promo py-3 text-sm font-bold text-promo-foreground"
             >
-              Payer 9 € via Stripe
+              {vipEligible ? "Booster à la Une — 9 € via Stripe" : "Payer 9 € via Stripe"}
             </button>
             <button
               type="button"
@@ -2102,7 +2121,11 @@ function OptionsScreen({
               onClick={onActivateBoost}
               className="w-full rounded-xl border border-input bg-card py-3 text-sm font-bold text-foreground hover:bg-secondary disabled:opacity-60"
             >
-              {pending ? "Activation…" : "Activer gratuitement (mode démo) — 24h"}
+              {pending
+                ? "Activation…"
+                : vipEligible
+                  ? "Booster à la Une (mode démo)"
+                  : "Activer gratuitement (mode démo) — 24h"}
             </button>
           </div>
         )}
