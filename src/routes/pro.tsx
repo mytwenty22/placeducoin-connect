@@ -512,6 +512,7 @@ function ProDashboard({ userId }: { userId: string }) {
         {screen === "options" ? (
           <OptionsScreen
             commerce={commerce}
+            userId={userId}
             accountType={accountType}
             pending={activateMutation.isPending}
             cancelPending={cancelMutation.isPending}
@@ -1838,11 +1839,28 @@ function bannerWindow(tier: BannerTierKey, monthKey: string): { start: Date; end
   };
 }
 
-function BannerReservationCard({ commerce }: { commerce: Commerce }) {
+function BannerReservationCard({ commerce, userId }: { commerce: Commerce; userId: string }) {
   const queryClient = useQueryClient();
   const [position, setPosition] = useState<"top" | "bottom">("top");
   const [tier, setTier] = useState<BannerTierKey>("test");
   const [monthKey, setMonthKey] = useState<string>(MONTH_OPTIONS[0]!.key);
+  const [bannerImageUrl, setBannerImageUrl] = useState("");
+  const [uploadingBannerImage, setUploadingBannerImage] = useState(false);
+
+  async function handleBannerImageFileChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploadingBannerImage(true);
+    try {
+      setBannerImageUrl(await uploadCommerceFile(userId, file, "banner"));
+      toast.success("Image téléversée");
+    } catch (error) {
+      toast.error((error as Error).message);
+    } finally {
+      setUploadingBannerImage(false);
+    }
+  }
 
   const villeQuery = useQuery({
     queryKey: ["ville", commerce.ville_id],
@@ -1922,10 +1940,14 @@ function BannerReservationCard({ commerce }: { commerce: Commerce }) {
 
   const reserveMutation = useMutation({
     mutationFn: async () => {
-      const imageUrl = commerce.logo_url || commerce.photo_url;
+      // Une image dédiée (facultative) permet d'avoir un visuel différent en Haut et en Bas de
+      // page ; sans elle, les deux emplacements réutilisent le même logo/photo de la fiche, ce
+      // qui peut donner l'impression trompeuse d'une bannière "dupliquée" d'un emplacement à
+      // l'autre alors qu'il s'agit bien de deux réservations distinctes.
+      const imageUrl = bannerImageUrl.trim() || commerce.logo_url || commerce.photo_url;
       if (!imageUrl) {
         throw new Error(
-          "Ajoutez d'abord une photo ou un logo à votre fiche (onglet Mon Profil) avant de réserver une bannière.",
+          "Ajoutez une image pour la bannière, ou une photo/logo à votre fiche (onglet Mon Profil), avant de réserver.",
         );
       }
       if (!villeQuery.data) throw new Error("Ville introuvable.");
@@ -1962,6 +1984,7 @@ function BannerReservationCard({ commerce }: { commerce: Commerce }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["banner-reservations", commerce.id] });
       queryClient.invalidateQueries({ queryKey: ["banner-active-count", departmentCode] });
+      setBannerImageUrl("");
       toast.success("Bannière réservée.");
     },
     onError: (error: Error) => toast.error(error.message),
@@ -2075,6 +2098,43 @@ function BannerReservationCard({ commerce }: { commerce: Commerce }) {
 
           <div>
             <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Image de la bannière (facultatif)
+            </span>
+            {bannerImageUrl ? (
+              <img
+                src={bannerImageUrl}
+                alt=""
+                className="mt-2 h-20 w-full rounded-xl object-cover"
+              />
+            ) : null}
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-input bg-card px-3 py-2 text-xs font-semibold text-foreground hover:bg-secondary">
+                <ImageIcon className="h-4 w-4" />
+                {uploadingBannerImage ? "Envoi…" : "Téléverser"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={uploadingBannerImage}
+                  onChange={handleBannerImageFileChange}
+                />
+              </label>
+              <span className="text-xs text-muted-foreground">ou</span>
+              <input
+                value={bannerImageUrl}
+                onChange={(e) => setBannerImageUrl(e.target.value)}
+                placeholder="https://…"
+                className="min-w-0 flex-1 rounded-xl border border-input bg-card px-3 py-2 text-xs text-foreground outline-none focus:border-navy"
+              />
+            </div>
+            <span className="mt-1 block text-xs text-muted-foreground">
+              Laissez vide pour reprendre le logo/photo de votre fiche. Utile pour avoir un visuel
+              différent en Haut et en Bas de page plutôt que la même image aux deux emplacements.
+            </span>
+          </div>
+
+          <div>
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Formule
             </span>
             <div className="mt-1.5 flex flex-wrap gap-2">
@@ -2168,6 +2228,7 @@ function BannerReservationCard({ commerce }: { commerce: Commerce }) {
 
 function OptionsScreen({
   commerce,
+  userId,
   accountType,
   pending,
   cancelPending,
@@ -2177,6 +2238,7 @@ function OptionsScreen({
   onCancelBoost,
 }: {
   commerce: Commerce;
+  userId: string;
   accountType: AccountType;
   pending: boolean;
   cancelPending: boolean;
@@ -2252,24 +2314,17 @@ function OptionsScreen({
         <p className="mt-2 text-sm text-muted-foreground">
           {vipEligible ? (
             <>
-              Action distincte de la publication d'une promo : place votre fiche dans le carrousel
-              VIP « À la Une », juste sous la bannière du haut, pendant 24h — en plus du badge rouge
-              « En Vedette » en tête du fil général.
+              En plus de votre visibilité prioritaire dans le fil général, l'Option À la Une (9 €)
+              place votre fiche dans le carrousel VIP situé entre la bannière du haut et le fil.
             </>
           ) : (
             <>
-              Fait remonter votre fiche en tête du fil général pendant 24h, avec le badge rouge « En
-              Vedette ».
+              Sans abonnement Site Pro, l'Option Vedette (9 €) place votre fiche tout en haut du fil
+              d'actualité général. L'accès au carrousel VIP « À la Une » nécessite l'abonnement Site
+              Pro.
             </>
           )}
         </p>
-        {vipEligible ? null : (
-          <p className="mt-2 rounded-xl bg-secondary p-3 text-xs text-muted-foreground">
-            Le carrousel VIP « À la Une », sous la bannière du haut, reste le privilège des abonnés
-            Site Pro (Option A) — cette option-ci ne fait remonter votre fiche que dans le fil
-            général.
-          </p>
-        )}
         {boostActive ? (
           <div className="mt-4 space-y-2">
             <p className="flex items-center justify-center gap-2 rounded-xl bg-mairie py-3 text-sm font-bold text-mairie-foreground">
@@ -2317,7 +2372,7 @@ function OptionsScreen({
         )}
       </article>
 
-      {accountType === "pro" ? <BannerReservationCard commerce={commerce} /> : null}
+      {accountType === "pro" ? <BannerReservationCard commerce={commerce} userId={userId} /> : null}
 
       {import.meta.env.DEV ? (
         <article className="surface-card p-5">
