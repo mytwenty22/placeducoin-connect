@@ -91,13 +91,13 @@ export function OfferCard({ commerce }: { commerce: CommerceListing }) {
             alt=""
             loading="lazy"
             decoding="async"
-            className="h-32 w-full object-cover"
+            className="h-32 w-full bg-slate-50 object-contain"
           />
           {commerce.logoUrl ? (
             <img
               src={commerce.logoUrl}
               alt=""
-              className="absolute bottom-2 left-2 h-8 w-8 rounded-full border-2 border-white object-cover shadow-card"
+              className="absolute bottom-2 left-2 h-8 w-8 rounded-full border-2 border-white bg-slate-50 object-contain shadow-card"
             />
           ) : null}
           {openStatus ? (
@@ -145,7 +145,7 @@ export function OfferCard({ commerce }: { commerce: CommerceListing }) {
             <img
               src={commerce.logoUrl}
               alt=""
-              className="h-8 w-8 shrink-0 rounded-full object-cover"
+              className="h-8 w-8 shrink-0 rounded-full bg-slate-50 object-contain"
             />
           ) : null}
           <div className="min-w-0">

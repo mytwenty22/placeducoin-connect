@@ -243,7 +243,7 @@ function StandaloneSite() {
             <img
               src={commerce.logo_url}
               alt={commerce.nom}
-              className="mx-auto h-16 w-16 rounded-full border-2 border-white/30 object-cover shadow-lift"
+              className="mx-auto h-16 w-16 rounded-full border-2 border-white/30 bg-slate-50 object-contain shadow-lift"
             />
           ) : (
             <div className="mx-auto grid h-16 w-16 place-items-center rounded-full border-2 border-white/30 bg-white/10 text-2xl font-black text-white">
@@ -346,7 +346,7 @@ function StandaloneSite() {
                           alt=""
                           loading="lazy"
                           decoding="async"
-                          className="h-14 w-14 shrink-0 rounded-xl object-cover"
+                          className="h-14 w-14 shrink-0 rounded-xl bg-slate-50 object-contain"
                         />
                       ) : null}
                       <div className="min-w-0 flex-1">
@@ -410,7 +410,7 @@ function StandaloneSite() {
                           alt=""
                           loading="lazy"
                           decoding="async"
-                          className="h-14 w-14 shrink-0 rounded-xl object-cover"
+                          className="h-14 w-14 shrink-0 rounded-xl bg-slate-50 object-contain"
                         />
                       ) : (
                         <div className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-slate-100">
@@ -465,7 +465,7 @@ function StandaloneSite() {
                           alt={`Photo ${i + 1} de ${commerce.nom}`}
                           loading="lazy"
                           decoding="async"
-                          className="h-full w-full object-cover transition-transform duration-300 hover:scale-110"
+                          className="h-full w-full bg-slate-50 object-contain transition-transform duration-300 hover:scale-110"
                         />
                       </div>
                     ))}

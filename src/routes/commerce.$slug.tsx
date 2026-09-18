@@ -187,7 +187,7 @@ function ShopSite() {
                 alt={offer.shop}
                 loading="lazy"
                 decoding="async"
-                className="aspect-square rounded-2xl object-cover shadow-card"
+                className="aspect-square rounded-2xl bg-slate-50 object-contain shadow-card"
               />
             ) : null}
             {GALLERY.slice(offer.photoUrl ? 1 : 0).map((g, i) => (

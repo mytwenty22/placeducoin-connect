@@ -20,7 +20,7 @@ export function SponsorBanner({
     <img
       src={banner.image_url}
       alt="Bannière partenaire"
-      className="block h-[200px] w-full object-cover object-center sm:h-[150px]"
+      className="block h-[200px] w-full bg-slate-50 object-contain object-center sm:h-[150px]"
     />
   ) : (
     <div className="flex h-[200px] w-full flex-col items-center justify-center gap-1.5 bg-gradient-navy px-4 text-center text-primary-foreground sm:h-[150px]">

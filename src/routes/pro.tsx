@@ -28,11 +28,13 @@ import {
 } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { EmailPasswordLogin } from "@/components/EmailPasswordLogin";
+import { SponsorBanner } from "@/components/SponsorBanner";
+import { OfferCard } from "@/components/OfferCard";
 import { supabase } from "@/lib/supabase";
 import { addNotification } from "@/lib/notifications-store";
 import { slugify } from "@/lib/slugify";
 import { parseCsv } from "@/lib/csv";
-import { CATEGORIES, type CategoryKey } from "@/lib/placeducoin-data";
+import { CATEGORIES, type CategoryKey, type CommerceListing } from "@/lib/placeducoin-data";
 import type { Horaire } from "@/lib/horaires";
 import { THEME_OPTIONS, THEME_STYLES, type ThemeVisuel } from "@/lib/site-theme";
 import { getReadableTextColor } from "@/lib/color";
@@ -455,7 +457,7 @@ function ProDashboard({ userId }: { userId: string }) {
           <img
             src={commerce.photo_url}
             alt=""
-            className="h-12 w-12 shrink-0 rounded-xl object-cover"
+            className="h-12 w-12 shrink-0 rounded-xl bg-slate-50 object-contain"
           />
         ) : null}
         <div className="min-w-0">
@@ -500,7 +502,7 @@ function ProDashboard({ userId }: { userId: string }) {
         {screen === "promo" ? (
           <PromoScreen
             userId={userId}
-            commerceId={commerce.id}
+            commerce={commerce}
             boosted={isBoostActive(commerce)}
             accountType={accountType}
           />
@@ -1031,7 +1033,11 @@ function ProfileScreen({
             Photo du commerce
           </span>
           {photoUrl ? (
-            <img src={photoUrl} alt="" className="mt-2 h-32 w-full rounded-xl object-cover" />
+            <img
+              src={photoUrl}
+              alt=""
+              className="mt-2 h-32 w-full rounded-xl bg-slate-50 object-contain"
+            />
           ) : null}
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-input bg-card px-3 py-2 text-xs font-semibold text-foreground hover:bg-secondary">
@@ -1063,7 +1069,11 @@ function ProfileScreen({
             <div className="mt-2 grid grid-cols-3 gap-2">
               {galerieUrls.map((url, i) => (
                 <div key={i} className="relative">
-                  <img src={url} alt="" className="aspect-square w-full rounded-lg object-cover" />
+                  <img
+                    src={url}
+                    alt=""
+                    className="aspect-square w-full rounded-lg bg-slate-50 object-contain"
+                  />
                   <button
                     type="button"
                     aria-label="Retirer cette photo"
@@ -1140,7 +1150,11 @@ function ProfileScreen({
             Logo
           </span>
           {logoUrl ? (
-            <img src={logoUrl} alt="" className="mt-2 h-16 w-16 rounded-full object-cover" />
+            <img
+              src={logoUrl}
+              alt=""
+              className="mt-2 h-16 w-16 rounded-full bg-slate-50 object-contain"
+            />
           ) : null}
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-input bg-card px-3 py-2 text-xs font-semibold text-foreground hover:bg-secondary">
@@ -1199,7 +1213,11 @@ function ProfileScreen({
               }}
             >
               {logoUrl ? (
-                <img src={logoUrl} alt="" className="mx-auto h-10 w-10 rounded-full object-cover" />
+                <img
+                  src={logoUrl}
+                  alt=""
+                  className="mx-auto h-10 w-10 rounded-full bg-white object-contain"
+                />
               ) : (
                 <div className="mx-auto grid h-10 w-10 place-items-center rounded-full bg-current/10 text-sm font-black">
                   {nom.charAt(0).toUpperCase() || "?"}
@@ -1209,6 +1227,38 @@ function ProfileScreen({
               <p className="text-xs opacity-80">{trade || "Métier"}</p>
             </div>
           </div>
+        </div>
+
+        <div className="block">
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Aperçu de la carte Marketplace
+          </span>
+          <div className="mt-2 max-w-xs pointer-events-none">
+            <OfferCard
+              commerce={{
+                id: commerce.id,
+                slug: commerce.slug,
+                shop: nom || "Nom du commerce",
+                trade: trade || "Métier",
+                category,
+                city: "",
+                distanceKm: 0,
+                address: adresse,
+                phone: telephone,
+                sponsored: isBoostActive(commerce),
+                premium: commerce.site_actif,
+                ...(photoUrl ? { photoUrl } : {}),
+                ...(logoUrl ? { logoUrl } : {}),
+                horaires,
+                themeVisuel,
+                ...(description ? { description } : {}),
+                promos: [],
+              }}
+            />
+          </div>
+          <span className="mt-1 block text-xs text-muted-foreground">
+            Rendu exact de votre fiche telle qu'elle apparaîtra sur la Marketplace.
+          </span>
         </div>
 
         {isAssociation ? null : (
@@ -1341,15 +1391,16 @@ const MAX_ACTIVE_PROMOS = 3;
 
 function PromoScreen({
   userId,
-  commerceId,
+  commerce,
   boosted,
   accountType,
 }: {
   userId: string;
-  commerceId: string;
+  commerce: Commerce;
   boosted: boolean;
   accountType: AccountType;
 }) {
+  const commerceId = commerce.id;
   const isAssociation = accountType === "association";
   const queryClient = useQueryClient();
   const [titre, setTitre] = useState("");
@@ -1569,7 +1620,11 @@ function PromoScreen({
                 Photo de l'offre
               </span>
               {photoUrl ? (
-                <img src={photoUrl} alt="" className="mt-2 h-32 w-full rounded-xl object-cover" />
+                <img
+                  src={photoUrl}
+                  alt=""
+                  className="mt-2 h-32 w-full rounded-xl bg-slate-50 object-contain"
+                />
               ) : null}
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-input bg-card px-3 py-2 text-xs font-semibold text-foreground hover:bg-secondary">
@@ -1631,6 +1686,52 @@ function PromoScreen({
           </>
         )}
 
+        <div className="block">
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Aperçu de la carte Marketplace
+          </span>
+          <div className="mt-2 max-w-xs pointer-events-none">
+            <OfferCard
+              commerce={{
+                id: commerce.id,
+                slug: commerce.slug,
+                shop: commerce.nom,
+                trade: commerce.trade,
+                category: commerce.category,
+                city: "",
+                distanceKm: 0,
+                address: commerce.adresse ?? "",
+                phone: commerce.telephone ?? "",
+                sponsored: isBoostActive(commerce),
+                premium: commerce.site_actif,
+                ...(commerce.photo_url ? { photoUrl: commerce.photo_url } : {}),
+                ...(commerce.logo_url ? { logoUrl: commerce.logo_url } : {}),
+                horaires: commerce.horaires,
+                themeVisuel: commerce.theme_visuel,
+                ...(commerce.description ? { description: commerce.description } : {}),
+                promos: [
+                  {
+                    id: "preview",
+                    title:
+                      titre.trim() || (isEvent ? "Titre de l'événement" : "Titre de votre offre"),
+                    kind,
+                    ...(!isEvent && prixAvant ? { priceBefore: Number(prixAvant) } : {}),
+                    ...(!isEvent && prixMaintenant ? { priceNow: Number(prixMaintenant) } : {}),
+                    endsInHours: isEvent ? 0 : Number(duration),
+                    ...(isEvent && eventDateTime
+                      ? { eventDate: new Date(eventDateTime).toISOString() }
+                      : {}),
+                    ...(!isEvent && photoUrl ? { photoUrl } : {}),
+                  },
+                ],
+              }}
+            />
+          </div>
+          <span className="mt-1 block text-xs text-muted-foreground">
+            Rendu exact tel qu'il apparaîtra sur la Marketplace.
+          </span>
+        </div>
+
         <button
           type="submit"
           disabled={publishMutation.isPending || limitReached}
@@ -1668,7 +1769,7 @@ function PromoScreen({
                   <img
                     src={p.photo_url}
                     alt=""
-                    className="h-10 w-10 shrink-0 rounded-lg object-cover"
+                    className="h-10 w-10 shrink-0 rounded-lg bg-slate-50 object-contain"
                   />
                 ) : p.kind === "evenement" ? (
                   <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-navy" />
@@ -2121,7 +2222,7 @@ function BannerReservationCard({ commerce, userId }: { commerce: Commerce; userI
               <img
                 src={bannerImageUrl}
                 alt=""
-                className="mt-2 h-20 w-full rounded-xl object-cover"
+                className="mt-2 h-20 w-full rounded-xl bg-slate-50 object-contain"
               />
             ) : null}
             <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -2152,6 +2253,26 @@ function BannerReservationCard({ commerce, userId }: { commerce: Commerce; userI
               Vos visuels sont automatiquement adaptés au format de la bannière. Pour un rendu
               parfait, privilégiez une image au format paysage (horizontal).
             </span>
+          </div>
+
+          <div>
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Aperçu {position === "top" ? "— Haut de page" : "— Bas de page"}
+            </span>
+            <div className="mt-1.5">
+              {(() => {
+                const previewImage =
+                  bannerImageUrl.trim() || commerce.logo_url || commerce.photo_url;
+                return (
+                  <SponsorBanner
+                    banner={previewImage ? { image_url: previewImage, target_url: null } : null}
+                    className=""
+                    placeholderTitle="Ajoutez une image ci-dessus pour voir l'aperçu"
+                    placeholderSubtitle="Rendu exact tel qu'il apparaîtra sur la Marketplace"
+                  />
+                );
+              })()}
+            </div>
           </div>
 
           <div>
@@ -2606,7 +2727,11 @@ function CatalogueScreen({ userId, commerceId }: { userId: string; commerceId: s
             Photo
           </span>
           {photoUrl ? (
-            <img src={photoUrl} alt="" className="mt-2 h-24 w-24 rounded-xl object-cover" />
+            <img
+              src={photoUrl}
+              alt=""
+              className="mt-2 h-24 w-24 rounded-xl bg-slate-50 object-contain"
+            />
           ) : null}
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-input bg-card px-3 py-2 text-xs font-semibold text-foreground hover:bg-secondary">
@@ -2646,7 +2771,7 @@ function CatalogueScreen({ userId, commerceId }: { userId: string; commerceId: s
                 <img
                   src={p.photo_url}
                   alt=""
-                  className="h-10 w-10 shrink-0 rounded-lg object-cover"
+                  className="h-10 w-10 shrink-0 rounded-lg bg-slate-50 object-contain"
                 />
               ) : (
                 <Package className="mt-0.5 h-4 w-4 shrink-0 text-navy" />
