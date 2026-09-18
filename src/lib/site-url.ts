@@ -11,8 +11,11 @@ const PROD_SITE_URL = "https://placeducoin-connect.vercel.app";
 // so a misconfigured env var can never leak Markdown syntax into an email link.
 function sanitizeSiteUrl(raw: string): string {
   const markdownLink = raw.match(/\[([^\]]+)\]\(([^)]+)\)/);
-  const url = markdownLink ? markdownLink[2] : raw;
-  return url.replace(/[[\]()]/g, "").trim().replace(/\/+$/, "");
+  const url = markdownLink?.[2] ?? raw;
+  return url
+    .replace(/[[\]()]/g, "")
+    .trim()
+    .replace(/\/+$/, "");
 }
 
 export function getSiteUrl() {
