@@ -36,6 +36,7 @@ import { CATEGORIES, type CategoryKey } from "@/lib/placeducoin-data";
 import type { Horaire } from "@/lib/horaires";
 import { THEME_OPTIONS, THEME_STYLES, type ThemeVisuel } from "@/lib/site-theme";
 import { getReadableTextColor } from "@/lib/color";
+import { isBoostActive } from "@/lib/boost";
 
 type AccountType = "pro" | "association";
 
@@ -68,6 +69,7 @@ type Commerce = {
   category: CategoryKey;
   ville_id: string;
   adresse: string | null;
+  code_postal: string | null;
   telephone: string | null;
   photo_url: string | null;
   logo_url: string | null;
@@ -79,6 +81,7 @@ type Commerce = {
   theme_visuel: ThemeVisuel;
   site_actif: boolean;
   boost_actif: boolean;
+  boost_expires_at: string | null;
 };
 type Promo = {
   id: string;
@@ -344,7 +347,7 @@ function ProDashboard({ userId }: { userId: string }) {
       const { data, error } = await supabase
         .from("commerces")
         .select(
-          "id, slug, nom, trade, category, ville_id, adresse, telephone, photo_url, logo_url, description, horaires, instagram, galerie_urls, video_url, theme_visuel, site_actif, boost_actif",
+          "id, slug, nom, trade, category, ville_id, adresse, code_postal, telephone, photo_url, logo_url, description, horaires, instagram, galerie_urls, video_url, theme_visuel, site_actif, boost_actif, boost_expires_at",
         )
         .eq("owner_id", userId)
         .maybeSingle();
@@ -357,9 +360,16 @@ function ProDashboard({ userId }: { userId: string }) {
   const activateMutation = useMutation({
     mutationFn: async (field: "site_actif" | "boost_actif") => {
       if (!commerceQuery.data) throw new Error("Commerce introuvable.");
+      const patch =
+        field === "boost_actif"
+          ? {
+              boost_actif: true,
+              boost_expires_at: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+            }
+          : { site_actif: true };
       const { error } = await supabase
         .from("commerces")
-        .update({ [field]: true })
+        .update(patch)
         .eq("id", commerceQuery.data.id);
       if (error) throw new Error(error.message);
     },
@@ -368,7 +378,29 @@ function ProDashboard({ userId }: { userId: string }) {
       toast.success(
         field === "site_actif"
           ? "Mode démo activé — votre site sur-mesure est en ligne"
-          : "Mode démo activé — votre offre est mise en avant",
+          : "Mode démo activé — votre offre est mise en avant 24h",
+      );
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: async (field: "site_actif" | "boost_actif") => {
+      if (!commerceQuery.data) throw new Error("Commerce introuvable.");
+      const patch =
+        field === "boost_actif"
+          ? { boost_actif: false, boost_expires_at: null }
+          : { site_actif: false };
+      const { error } = await supabase
+        .from("commerces")
+        .update(patch)
+        .eq("id", commerceQuery.data.id);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: (_result, field) => {
+      queryClient.invalidateQueries({ queryKey: ["commerce", userId] });
+      toast.success(
+        field === "site_actif" ? "Abonnement Site Pro annulé." : "Option Vedette annulée.",
       );
     },
     onError: (error: Error) => toast.error(error.message),
@@ -440,8 +472,8 @@ function ProDashboard({ userId }: { userId: string }) {
           label={commerce.site_actif ? "Site actif" : "Formule gratuite"}
         />
         <StatusPill
-          active={commerce.boost_actif}
-          label={commerce.boost_actif ? "En Vedette" : "Non sponsorisé"}
+          active={isBoostActive(commerce)}
+          label={isBoostActive(commerce) ? "En Vedette" : "Non sponsorisé"}
           tone="promo"
         />
       </div>
@@ -469,7 +501,7 @@ function ProDashboard({ userId }: { userId: string }) {
           <PromoScreen
             userId={userId}
             commerceId={commerce.id}
-            boosted={commerce.boost_actif}
+            boosted={isBoostActive(commerce)}
             accountType={accountType}
           />
         ) : null}
@@ -482,8 +514,11 @@ function ProDashboard({ userId }: { userId: string }) {
             commerce={commerce}
             accountType={accountType}
             pending={activateMutation.isPending}
+            cancelPending={cancelMutation.isPending}
             onActivateSite={() => activateMutation.mutate("site_actif")}
             onActivateBoost={() => activateMutation.mutate("boost_actif")}
+            onCancelSite={() => cancelMutation.mutate("site_actif")}
+            onCancelBoost={() => cancelMutation.mutate("boost_actif")}
           />
         ) : null}
       </div>
@@ -541,6 +576,8 @@ function StatusPill({
   );
 }
 
+const POSTAL_CODE_REGEX = /^\d{5}$/;
+
 async function insertCommerceWithUniqueSlug(input: {
   owner_id: string;
   ville_id: string;
@@ -548,6 +585,7 @@ async function insertCommerceWithUniqueSlug(input: {
   trade: string;
   category: CategoryKey;
   adresse: string;
+  code_postal: string;
   telephone: string;
 }) {
   const baseSlug = slugify(input.nom) || "commerce";
@@ -577,6 +615,7 @@ function CreateCommerceForm({
   );
   const [villeId, setVilleId] = useState("");
   const [adresse, setAdresse] = useState("");
+  const [codePostal, setCodePostal] = useState("");
   const [telephone, setTelephone] = useState("");
   const [pending, setPending] = useState(false);
 
@@ -598,6 +637,10 @@ function CreateCommerceForm({
           toast.error("Nom et ville sont requis.");
           return;
         }
+        if (!POSTAL_CODE_REGEX.test(codePostal.trim())) {
+          toast.error("Code postal invalide (5 chiffres).");
+          return;
+        }
         setPending(true);
         try {
           await insertCommerceWithUniqueSlug({
@@ -607,6 +650,7 @@ function CreateCommerceForm({
             trade,
             category: isAssociation ? "locale" : category,
             adresse,
+            code_postal: codePostal.trim(),
             telephone,
           });
           onCreated();
@@ -669,9 +713,10 @@ function CreateCommerceForm({
 
       <label className="block">
         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Ville
+          Ville *
         </span>
         <select
+          required
           value={villeId}
           onChange={(e) => setVilleId(e.target.value)}
           className="mt-1 w-full rounded-xl border border-input bg-card px-3 py-2.5 text-sm text-foreground outline-none focus:border-navy"
@@ -686,6 +731,12 @@ function CreateCommerceForm({
       </label>
 
       <Field label="Adresse" value={adresse} onChange={setAdresse} placeholder="12 rue du Marché" />
+      <Field
+        label="Code postal *"
+        value={codePostal}
+        onChange={(v) => setCodePostal(v.replace(/[^\d]/g, "").slice(0, 5))}
+        placeholder="74000"
+      />
       <Field
         label="Téléphone"
         value={telephone}
@@ -774,7 +825,9 @@ function ProfileScreen({
   const [trade, setTrade] = useState(commerce.trade);
   const [category, setCategory] = useState<CategoryKey>(commerce.category);
   const [savingCategory, setSavingCategory] = useState(false);
+  const [villeId, setVilleId] = useState(commerce.ville_id);
   const [adresse, setAdresse] = useState(commerce.adresse ?? "");
+  const [codePostal, setCodePostal] = useState(commerce.code_postal ?? "");
   const [telephone, setTelephone] = useState(commerce.telephone ?? "");
   const [photoUrl, setPhotoUrl] = useState(commerce.photo_url ?? "");
   const [logoUrl, setLogoUrl] = useState(commerce.logo_url ?? "");
@@ -790,6 +843,15 @@ function ProfileScreen({
   const [uploadingGalerie, setUploadingGalerie] = useState(false);
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const [pending, setPending] = useState(false);
+
+  const villesQuery = useQuery({
+    queryKey: ["villes"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("villes").select("id, nom").order("nom");
+      if (error) throw error;
+      return data as Ville[];
+    },
+  });
 
   async function handleCategoryClick(key: CategoryKey) {
     if (key === category) return;
@@ -924,13 +986,23 @@ function ProfileScreen({
         className="surface-card space-y-4 p-5"
         onSubmit={async (e) => {
           e.preventDefault();
+          if (!villeId) {
+            toast.error("La ville est obligatoire.");
+            return;
+          }
+          if (!POSTAL_CODE_REGEX.test(codePostal.trim())) {
+            toast.error("Code postal invalide (5 chiffres).");
+            return;
+          }
           setPending(true);
           const { error } = await supabase
             .from("commerces")
             .update({
               nom,
               trade,
+              ville_id: villeId,
               adresse,
+              code_postal: codePostal.trim(),
               telephone,
               photo_url: photoUrl || null,
               logo_url: logoUrl || null,
@@ -1176,7 +1248,34 @@ function ProfileScreen({
           placeholder="Quelques phrases pour présenter votre commerce…"
           textarea
         />
+        <label className="block">
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Ville *
+          </span>
+          <select
+            required
+            value={villeId}
+            onChange={(e) => setVilleId(e.target.value)}
+            className="mt-1 w-full rounded-xl border border-input bg-card px-3 py-2.5 text-sm text-foreground outline-none focus:border-navy"
+          >
+            <option value="">{villesQuery.isLoading ? "Chargement…" : "Choisir une ville"}</option>
+            {villesQuery.data?.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.nom}
+              </option>
+            ))}
+          </select>
+          <span className="mt-1 block text-xs text-muted-foreground">
+            Rattache votre fiche à la bonne commune sur la Marketplace.
+          </span>
+        </label>
         <Field label="Adresse" value={adresse} onChange={setAdresse} />
+        <Field
+          label="Code postal *"
+          value={codePostal}
+          onChange={(v) => setCodePostal(v.replace(/[^\d]/g, "").slice(0, 5))}
+          placeholder="74000"
+        />
         <Field label="Téléphone" value={telephone} onChange={setTelephone} />
         <Field
           label="Lien du compte Instagram"
@@ -1891,15 +1990,24 @@ function OptionsScreen({
   commerce,
   accountType,
   pending,
+  cancelPending,
   onActivateSite,
   onActivateBoost,
+  onCancelSite,
+  onCancelBoost,
 }: {
   commerce: Commerce;
   accountType: AccountType;
   pending: boolean;
+  cancelPending: boolean;
   onActivateSite: () => void;
   onActivateBoost: () => void;
+  onCancelSite: () => void;
+  onCancelBoost: () => void;
 }) {
+  const boostExpiresAt = commerce.boost_expires_at ? new Date(commerce.boost_expires_at) : null;
+  const boostActive = isBoostActive(commerce);
+
   return (
     <div className="space-y-4">
       <article className="surface-card p-5">
@@ -1913,13 +2021,23 @@ function OptionsScreen({
           Débloquez votre site web sur-mesure et des promos illimitées.
         </p>
         {commerce.site_actif ? (
-          <Link
-            to="/site/$slug"
-            params={{ slug: commerce.slug }}
-            className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-mairie py-3 text-sm font-bold text-mairie-foreground"
-          >
-            <Check className="h-4 w-4" /> Voir mon site
-          </Link>
+          <div className="mt-4 space-y-2">
+            <Link
+              to="/site/$slug"
+              params={{ slug: commerce.slug }}
+              className="flex items-center justify-center gap-2 rounded-xl bg-mairie py-3 text-sm font-bold text-mairie-foreground"
+            >
+              <Check className="h-4 w-4" /> Voir mon site
+            </Link>
+            <button
+              type="button"
+              disabled={cancelPending}
+              onClick={onCancelSite}
+              className="w-full rounded-xl border border-input bg-card py-3 text-sm font-bold text-foreground hover:bg-secondary disabled:opacity-60"
+            >
+              {cancelPending ? "Annulation…" : "Annuler l'abonnement"}
+            </button>
+          </div>
         ) : (
           <div className="mt-4 space-y-2">
             <button
@@ -1945,17 +2063,30 @@ function OptionsScreen({
         <div className="flex items-center gap-2">
           <Zap className="h-5 w-5 shrink-0 text-promo" />
           <h2 className="font-display text-lg font-extrabold text-foreground">
-            Option B · 9 € ponctuel
+            Option B · 9 € pour 24h
           </h2>
         </div>
         <p className="mt-2 text-sm text-muted-foreground">
-          Mettez votre offre tout en haut de la marketplace pendant 48h, avec badge rouge « En
-          Vedette ».
+          Mettez votre offre tout en haut de la marketplace pendant 24h, avec badge rouge « En
+          Vedette ». Cumulée avec l'Option A, votre fiche apparaît aussi dans l'encart « À la une ».
         </p>
-        {commerce.boost_actif ? (
-          <p className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-mairie py-3 text-sm font-bold text-mairie-foreground">
-            <Check className="h-4 w-4" /> Offre en vedette
-          </p>
+        {boostActive ? (
+          <div className="mt-4 space-y-2">
+            <p className="flex items-center justify-center gap-2 rounded-xl bg-mairie py-3 text-sm font-bold text-mairie-foreground">
+              <Check className="h-4 w-4" /> Offre en vedette
+              {boostExpiresAt
+                ? ` — jusqu'au ${boostExpiresAt.toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`
+                : ""}
+            </p>
+            <button
+              type="button"
+              disabled={cancelPending}
+              onClick={onCancelBoost}
+              className="w-full rounded-xl border border-input bg-card py-3 text-sm font-bold text-foreground hover:bg-secondary disabled:opacity-60"
+            >
+              {cancelPending ? "Annulation…" : "Annuler l'option Vedette"}
+            </button>
+          </div>
         ) : (
           <div className="mt-4 space-y-2">
             <button
@@ -1971,7 +2102,7 @@ function OptionsScreen({
               onClick={onActivateBoost}
               className="w-full rounded-xl border border-input bg-card py-3 text-sm font-bold text-foreground hover:bg-secondary disabled:opacity-60"
             >
-              {pending ? "Activation…" : "Activer gratuitement (mode démo)"}
+              {pending ? "Activation…" : "Activer gratuitement (mode démo) — 24h"}
             </button>
           </div>
         )}

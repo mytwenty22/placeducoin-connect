@@ -16,8 +16,10 @@ import {
 import { supabase } from "@/lib/supabase";
 import { normalizeSearch } from "@/lib/utils";
 import { withComputedDistance } from "@/lib/geo";
+import { isBoostActive } from "@/lib/boost";
 import { useUserPrefs } from "@/lib/user-prefs";
 import { useVedetteAlerts } from "@/hooks/use-vedette-alerts";
+import { useMarketplaceRealtime } from "@/hooks/use-marketplace-realtime";
 import type { Horaire } from "@/lib/horaires";
 import type { ThemeVisuel } from "@/lib/site-theme";
 
@@ -74,6 +76,7 @@ type CommerceRow = {
   theme_visuel: ThemeVisuel;
   site_actif: boolean;
   boost_actif: boolean;
+  boost_expires_at: string | null;
   google_rating: number | null;
   google_review_count: number | null;
   promos: PromoEmbed[];
@@ -121,7 +124,7 @@ function mapCommerceToListing(row: CommerceRow, fallbackCity: string): CommerceL
     distanceKm: 0,
     address: row.adresse ?? "",
     phone: row.telephone ?? "",
-    sponsored: row.boost_actif,
+    sponsored: isBoostActive(row),
     premium: row.site_actif,
     ...(row.photo_url ? { photoUrl: row.photo_url } : {}),
     ...(row.logo_url ? { logoUrl: row.logo_url } : {}),
@@ -134,18 +137,27 @@ function mapCommerceToListing(row: CommerceRow, fallbackCity: string): CommerceL
   };
 }
 
-// Hiérarchie d'affichage de la marketplace : Vedette (boost_actif) en tête, puis Site Pro
-// (site_actif), puis les fiches gratuites. Un commerce avec une offre active en cours passe
-// avant les autres commerces du même rang, puis on retombe sur l'ordre alphabétique.
+// Hiérarchie d'affichage de la marketplace : en tête, les abonnés Site Pro (site_actif) et les
+// commerces ayant payé l'option Vedette 24h (sponsored) -- les deux groupes payants partagent le
+// haut du fil, les fiches gratuites sans aucune option restent en bas. Au sein du groupe payant,
+// Vedette passe devant (badge rouge, option limitée dans le temps) ; un commerce avec une offre
+// active en cours passe avant les autres du même rang, puis on retombe sur l'ordre alphabétique.
 function sortByTier(commerces: CommerceListing[]): CommerceListing[] {
-  function tier(c: CommerceListing): number {
+  // Groupe (0 = payant : Site Pro et/ou Vedette, 1 = gratuit sans aucune option).
+  function group(c: CommerceListing): number {
+    return c.sponsored || c.premium ? 0 : 1;
+  }
+  // Au sein du groupe payant, Vedette (badge rouge, option 24h) passe devant Site Pro seul.
+  function rank(c: CommerceListing): number {
     if (c.sponsored) return 0;
     if (c.premium) return 1;
     return 2;
   }
   return [...commerces].sort((a, b) => {
-    const tierDiff = tier(a) - tier(b);
-    if (tierDiff !== 0) return tierDiff;
+    const groupDiff = group(a) - group(b);
+    if (groupDiff !== 0) return groupDiff;
+    const rankDiff = rank(a) - rank(b);
+    if (rankDiff !== 0) return rankDiff;
     const hasPromoDiff = (b.promos.length > 0 ? 1 : 0) - (a.promos.length > 0 ? 1 : 0);
     if (hasPromoDiff !== 0) return hasPromoDiff;
     return a.shop.localeCompare(b.shop, "fr");
@@ -209,7 +221,7 @@ function Marketplace() {
       const { data, error } = await supabase
         .from("commerces")
         .select(
-          "id, slug, nom, trade, category, adresse, telephone, photo_url, logo_url, description, horaires, theme_visuel, site_actif, boost_actif, google_rating, google_review_count, promos(id, titre, kind, photo_url, prix_avant, prix_maintenant, valide_jusqu_a, created_at)",
+          "id, slug, nom, trade, category, adresse, telephone, photo_url, logo_url, description, horaires, theme_visuel, site_actif, boost_actif, boost_expires_at, google_rating, google_review_count, promos(id, titre, kind, photo_url, prix_avant, prix_maintenant, valide_jusqu_a, created_at)",
         )
         .eq("ville_id", selectedVille?.id)
         .gt("promos.valide_jusqu_a", new Date().toISOString());
@@ -217,7 +229,13 @@ function Marketplace() {
       return (data as unknown as CommerceRow[]).map((row) => mapCommerceToListing(row, city));
     },
     enabled: !!selectedVille,
+    // L'option Vedette expire au bout de 24h sans qu'aucune écriture en base ne le déclenche :
+    // un refetch périodique est nécessaire pour que l'expiration se reflète "immédiatement" même
+    // sur un onglet resté ouvert (les annulations explicites, elles, arrivent par Realtime).
+    refetchInterval: 30_000,
   });
+
+  useMarketplaceRealtime();
 
   const commercesWithDistance = withComputedDistance(commercesQuery.data ?? [], position);
   useVedetteAlerts(commercesWithDistance, { radiusKm, favoriteCategories, hasPosition });
@@ -238,6 +256,13 @@ function Marketplace() {
   const visibleCommerces = hasPosition
     ? filteredWithDistance.filter((c) => c.distanceKm <= radiusKm)
     : filteredWithDistance;
+
+  // Encart VIP "À la une" : réservé aux commerces qui cumulent Site Pro ET l'option Vedette 24h
+  // en cours -- pas juste l'un ou l'autre. Dès que le boost expire (isBoostActive côté requête)
+  // ou que l'abonnement Site Pro est annulé, le commerce en sort au prochain refetch/realtime.
+  const vip = hasPosition
+    ? commercesWithDistance.filter((c) => c.sponsored && c.premium && c.distanceKm <= radiusKm)
+    : commercesWithDistance.filter((c) => c.sponsored && c.premium);
 
   const noticesQuery = useQuery({
     queryKey: ["infos-mairie-public", selectedVille?.id],
@@ -384,6 +409,23 @@ function Marketplace() {
 
       {/* Bannière sponsorisée par commune : bannière-modèle tant qu'aucune vraie pub n'est configurée */}
       <SponsorBanner banner={bannerQuery.data} />
+
+      {/* Espace VIP "À la une" : Site Pro + Vedette 24h cumulés, juste sous la bannière */}
+      {!isSearching && vip.length > 0 ? (
+        <section className="mx-auto max-w-6xl px-4 pt-6">
+          <div className="flex items-center gap-2">
+            <h2 className="font-display text-xl font-extrabold text-foreground">À la Une</h2>
+            <span className="rounded-full bg-promo/10 px-2 py-1 text-[11px] font-bold uppercase text-promo">
+              VIP
+            </span>
+          </div>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {vip.map((c) => (
+              <OfferCard key={`vip-${c.id}`} commerce={c} />
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {/* Onglets catégories : juste sous la barre de recherche */}
       <section className="mx-auto max-w-6xl px-4 pt-6">
