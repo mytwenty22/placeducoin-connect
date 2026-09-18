@@ -1917,8 +1917,11 @@ function monthOptions(count: number) {
   return Array.from({ length: count }, (_, i) => {
     const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + i, 1));
     const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
-    const label = d.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
-    return { key, label };
+    const calendarLabel = d.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+    // "Mois en cours" / "Mois +1" ... rend l'écart avec aujourd'hui immédiatement lisible, en plus
+    // du nom du mois calendaire pour lever toute ambiguïté sur la date exacte visée.
+    const relativeLabel = i === 0 ? "Mois en cours" : `Mois +${i}`;
+    return { key, label: `${relativeLabel} (${calendarLabel})`, calendarLabel };
   });
 }
 const MONTH_OPTIONS = monthOptions(6);
@@ -2333,7 +2336,7 @@ function BannerReservationCard({ commerce, userId }: { commerce: Commerce; userI
               ? used > 0
                 ? "Fenêtre déjà occupée — indisponible en Exclusif."
                 : `Fenêtre entièrement libre (${maxSlots}/${maxSlots} places) : Exclusif disponible.`
-              : `${availableSlots}/${maxSlots} places disponibles pour ${position === "top" ? "le Haut de page" : "le Bas de page"}${tier !== "test" ? ` en ${MONTH_OPTIONS.find((m) => m.key === monthKey)?.label}` : ""}.`}
+              : `${availableSlots}/${maxSlots} places disponibles pour ${position === "top" ? "le Haut de page" : "le Bas de page"}${tier !== "test" ? ` en ${MONTH_OPTIONS.find((m) => m.key === monthKey)?.calendarLabel}` : ""}.`}
           </p>
 
           {capacityReached ? (

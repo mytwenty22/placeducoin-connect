@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Search, MapPin, ChevronDown, Megaphone, Building2 } from "lucide-react";
@@ -576,7 +576,10 @@ function Marketplace() {
       <BottomSponsorBanner banner={bottomBannerQuery.data} />
 
       <footer className="bg-gradient-navy py-8 text-center text-sm text-primary-foreground/70">
-        PlaceDuCoin — le commerce local, à portée de rue.
+        <p>PlaceDuCoin — le commerce local, à portée de rue.</p>
+        <Link to="/cgv" className="mt-2 inline-block underline hover:text-primary-foreground">
+          Conditions Générales de Vente & Mentions Légales
+        </Link>
       </footer>
     </div>
   );

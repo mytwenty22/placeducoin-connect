@@ -544,9 +544,14 @@ function StandaloneSite() {
       </main>
 
       <footer className={`border-t py-4 text-center text-xs ${dividerClass} ${mutedClass}`}>
-        Propulsé par{" "}
-        <Link to="/" className="font-semibold hover:underline">
-          PlaceDuCoin
+        <p>
+          Propulsé par{" "}
+          <Link to="/" className="font-semibold hover:underline">
+            PlaceDuCoin
+          </Link>
+        </p>
+        <Link to="/cgv" className="mt-1 inline-block underline hover:no-underline">
+          Conditions Générales de Vente & Mentions Légales
         </Link>
       </footer>
     </div>
