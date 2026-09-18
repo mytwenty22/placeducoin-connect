@@ -2005,6 +2005,23 @@ function BannerReservationCard({ commerce, userId }: { commerce: Commerce; userI
     onError: (error: Error) => toast.error(error.message),
   });
 
+  // Le quota est partagé entre tous les commerces d'une même ville/mois : quand n'importe qui
+  // (y compris un autre commerçant, dans un autre onglet) annule une bannière, la place doit se
+  // libérer ici aussi sans rafraîchissement manuel -- l'invalidation dans onSuccess ne couvre que
+  // l'onglet qui a cliqué "Annuler".
+  useEffect(() => {
+    const channel = supabase
+      .channel(`banner-capacity-${commerce.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "banners" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["banner-reservations", commerce.id] });
+        queryClient.invalidateQueries({ queryKey: ["banner-active-count", departmentCode] });
+      })
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [commerce.id, departmentCode, queryClient]);
+
   const loading = villeQuery.isLoading || zonesQuery.isLoading || reservationsQuery.isLoading;
   const zone = (zonesQuery.data ?? []).find((z) => z.department_code === departmentCode) ?? null;
   const inZone = !!departmentCode && !!zone;
@@ -2130,6 +2147,10 @@ function BannerReservationCard({ commerce, userId }: { commerce: Commerce; userI
             <span className="mt-1 block text-xs text-muted-foreground">
               Laissez vide pour reprendre le logo/photo de votre fiche. Utile pour avoir un visuel
               différent en Haut et en Bas de page plutôt que la même image aux deux emplacements.
+            </span>
+            <span className="mt-1 block text-xs text-muted-foreground">
+              Vos visuels sont automatiquement adaptés au format de la bannière. Pour un rendu
+              parfait, privilégiez une image au format paysage (horizontal).
             </span>
           </div>
 
