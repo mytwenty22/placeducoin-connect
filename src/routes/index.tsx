@@ -289,6 +289,7 @@ function Marketplace() {
         .eq("city_slug", selectedVille?.slug)
         .eq("position", "top")
         .eq("active", true)
+        .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -296,6 +297,7 @@ function Marketplace() {
       return data;
     },
     enabled: !!selectedVille,
+    refetchInterval: 30_000,
   });
 
   const bottomBannerQuery = useQuery({
@@ -307,6 +309,7 @@ function Marketplace() {
         .eq("city_slug", selectedVille?.slug)
         .eq("position", "bottom")
         .eq("active", true)
+        .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -314,6 +317,7 @@ function Marketplace() {
       return data;
     },
     enabled: !!selectedVille,
+    refetchInterval: 30_000,
   });
 
   return (

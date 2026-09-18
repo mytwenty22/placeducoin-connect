@@ -1794,12 +1794,29 @@ type BannerReservation = {
   position: "top" | "bottom";
   active: boolean;
   city_slug: string;
+  expires_at: string | null;
 };
 
 type BannerZone = { department_code: string; max_active_banners: number };
 
+const BANNER_DURATIONS = [
+  { key: "1w", label: "1 semaine", days: 7 },
+  { key: "2w", label: "2 semaines", days: 14 },
+  { key: "1m", label: "1 mois", days: 30 },
+  { key: "3m", label: "3 mois", days: 90 },
+] as const;
+type BannerDurationKey = (typeof BANNER_DURATIONS)[number]["key"];
+
+// Même tarif neutre quel que soit le statut Pro/gratuit du commerce -- l'accès à la bannière ne
+// dépend pas de l'abonnement Site Pro. Fourchette 50-300 € en haut, 40-250 € en bas.
+const BANNER_PRICES: Record<"top" | "bottom", Record<BannerDurationKey, number>> = {
+  top: { "1w": 50, "2w": 90, "1m": 150, "3m": 300 },
+  bottom: { "1w": 40, "2w": 75, "1m": 120, "3m": 250 },
+};
+
 function BannerReservationCard({ commerce }: { commerce: Commerce }) {
   const queryClient = useQueryClient();
+  const [duration, setDuration] = useState<BannerDurationKey>("1w");
   const [position, setPosition] = useState<"top" | "bottom">("top");
 
   const villeQuery = useQuery({
@@ -1831,7 +1848,7 @@ function BannerReservationCard({ commerce }: { commerce: Commerce }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("banners")
-        .select("id, position, active, city_slug")
+        .select("id, position, active, city_slug, expires_at")
         .eq("commerce_id", commerce.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -1874,6 +1891,18 @@ function BannerReservationCard({ commerce }: { commerce: Commerce }) {
         );
       }
       if (!villeQuery.data) throw new Error("Ville introuvable.");
+      const days = BANNER_DURATIONS.find((d) => d.key === duration)?.days ?? 7;
+      // Une réservation remplace la précédente pour le même emplacement plutôt que de s'empiler
+      // à côté : sans ça, chaque nouveau clic laissait l'ancienne bannière active pour toujours
+      // (jamais affichée -- seule la plus récente l'est -- mais comptant quand même dans le quota
+      // de la zone).
+      const { error: deleteError } = await supabase
+        .from("banners")
+        .delete()
+        .eq("commerce_id", commerce.id)
+        .eq("position", position)
+        .eq("active", true);
+      if (deleteError) throw new Error(deleteError.message);
       const { error } = await supabase.from("banners").insert({
         city_slug: villeQuery.data.slug,
         image_url: imageUrl,
@@ -1881,6 +1910,7 @@ function BannerReservationCard({ commerce }: { commerce: Commerce }) {
         position,
         active: true,
         commerce_id: commerce.id,
+        expires_at: new Date(Date.now() + days * 24 * 3600 * 1000).toISOString(),
         ...(departmentCode ? { target_departments: [departmentCode] } : {}),
       });
       if (error) throw new Error(error.message);
@@ -1936,25 +1966,32 @@ function BannerReservationCard({ commerce }: { commerce: Commerce }) {
         </p>
       ) : (
         <div className="mt-4 space-y-3">
-          {reservations.map((r) => (
-            <div
-              key={r.id}
-              className="flex items-center justify-between gap-2 rounded-xl border border-border bg-card px-3 py-2.5"
-            >
-              <span className="text-xs font-semibold text-foreground">
-                {r.position === "top" ? "Bannière du haut" : "Bannière du bas"} —{" "}
-                {r.active ? "active" : "inactive"}
-              </span>
-              <button
-                type="button"
-                onClick={() => cancelMutation.mutate(r.id)}
-                disabled={cancelMutation.isPending}
-                className="shrink-0 text-xs font-semibold text-promo hover:underline disabled:opacity-60"
+          {reservations.map((r) => {
+            const expiresAt = r.expires_at ? new Date(r.expires_at) : null;
+            const expired = r.active && !!expiresAt && expiresAt.getTime() < Date.now();
+            return (
+              <div
+                key={r.id}
+                className="flex items-center justify-between gap-2 rounded-xl border border-border bg-card px-3 py-2.5"
               >
-                Annuler
-              </button>
-            </div>
-          ))}
+                <span className="text-xs font-semibold text-foreground">
+                  {r.position === "top" ? "Bannière du haut" : "Bannière du bas"} —{" "}
+                  {r.active && !expired ? "active" : "inactive"}
+                  {r.active && !expired && expiresAt
+                    ? ` (jusqu'au ${expiresAt.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })})`
+                    : ""}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => cancelMutation.mutate(r.id)}
+                  disabled={cancelMutation.isPending}
+                  className="shrink-0 text-xs font-semibold text-promo hover:underline disabled:opacity-60"
+                >
+                  Annuler
+                </button>
+              </div>
+            );
+          })}
 
           <div className="flex flex-wrap gap-2">
             {(["top", "bottom"] as const).map((p) => (
@@ -1972,14 +2009,63 @@ function BannerReservationCard({ commerce }: { commerce: Commerce }) {
               </button>
             ))}
           </div>
-          <button
-            type="button"
-            disabled={reserveMutation.isPending}
-            onClick={() => reserveMutation.mutate()}
-            className="w-full rounded-xl border border-input bg-card py-3 text-sm font-bold text-foreground hover:bg-secondary disabled:opacity-60"
-          >
-            {reserveMutation.isPending ? "Réservation…" : "Réserver gratuitement (mode démo)"}
-          </button>
+
+          <div>
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Durée
+            </span>
+            <div className="mt-1.5 flex flex-wrap gap-2">
+              {BANNER_DURATIONS.map((d) => (
+                <button
+                  key={d.key}
+                  type="button"
+                  onClick={() => setDuration(d.key)}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    duration === d.key
+                      ? "border-transparent bg-promo text-promo-foreground"
+                      : "border-border bg-card text-foreground hover:bg-secondary"
+                  }`}
+                >
+                  {d.label} · {BANNER_PRICES[position][d.key]} €
+                </button>
+              ))}
+            </div>
+            <span className="mt-1 block text-xs text-muted-foreground">
+              Même tarif que vous soyez abonné Site Pro ou en formule gratuite.
+            </span>
+          </div>
+
+          {capacityReached ? (
+            <p className="flex items-start gap-2 rounded-xl bg-secondary p-3 text-xs text-muted-foreground">
+              <Ban className="mt-0.5 h-4 w-4 shrink-0 text-promo" />
+              Capacité de bannières atteinte pour votre département ({zone?.max_active_banners}{" "}
+              max). Attendez qu'une place se libère ou contactez-nous.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() =>
+                  toast(
+                    `Paiement Stripe non configuré dans cette démo (${BANNER_PRICES[position][duration]} €).`,
+                  )
+                }
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-promo py-3 text-sm font-bold text-promo-foreground"
+              >
+                Payer {BANNER_PRICES[position][duration]} € via Stripe
+              </button>
+              <button
+                type="button"
+                disabled={reserveMutation.isPending}
+                onClick={() => reserveMutation.mutate()}
+                className="w-full rounded-xl border border-input bg-card py-3 text-sm font-bold text-foreground hover:bg-secondary disabled:opacity-60"
+              >
+                {reserveMutation.isPending
+                  ? "Réservation…"
+                  : `Réserver gratuitement (mode démo) — ${BANNER_DURATIONS.find((d) => d.key === duration)?.label}`}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </article>
@@ -2074,16 +2160,22 @@ function OptionsScreen({
             <>
               Action distincte de la publication d'une promo : place votre fiche dans le carrousel
               VIP « À la Une », juste sous la bannière du haut, pendant 24h — en plus du badge rouge
-              « En Vedette » en tête du fil standard.
+              « En Vedette » en tête du fil général.
             </>
           ) : (
             <>
-              Fait remonter votre fiche en tête du fil standard pendant 24h, avec le badge rouge «
-              En Vedette ». Le carrousel VIP « À la Une » est réservé aux abonnés Site Pro (Option
-              A).
+              Fait remonter votre fiche en tête du fil général pendant 24h, avec le badge rouge « En
+              Vedette ».
             </>
           )}
         </p>
+        {vipEligible ? null : (
+          <p className="mt-2 rounded-xl bg-secondary p-3 text-xs text-muted-foreground">
+            Le carrousel VIP « À la Une », sous la bannière du haut, reste le privilège des abonnés
+            Site Pro (Option A) — cette option-ci ne fait remonter votre fiche que dans le fil
+            général.
+          </p>
+        )}
         {boostActive ? (
           <div className="mt-4 space-y-2">
             <p className="flex items-center justify-center gap-2 rounded-xl bg-mairie py-3 text-sm font-bold text-mairie-foreground">
