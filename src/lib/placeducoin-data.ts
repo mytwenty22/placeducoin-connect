@@ -68,6 +68,44 @@ export type Offer = {
   googleReviewCount?: number;
 };
 
+// Une "offre" ponctuelle (promo/arrivage/événement) affichée dans le carrousel d'une carte
+// commerce sur la marketplace — jamais rendue seule, toujours à l'intérieur d'un CommerceListing.
+export type PromoItem = {
+  id: string;
+  title: string;
+  kind: "promo" | "arrivage" | "evenement";
+  priceBefore?: number;
+  priceNow?: number;
+  endsInHours: number;
+  eventDate?: string;
+  photoUrl?: string;
+};
+
+// Une carte commerce de la marketplace : une seule carte par commerce (annuaire général), avec
+// ses éventuelles offres actives regroupées dans `promos` plutôt que dupliquées en plusieurs
+// cartes. `sponsored` (boost_actif) et `premium` (site_actif) déterminent son rang d'affichage.
+export type CommerceListing = {
+  id: string;
+  slug: string;
+  shop: string;
+  trade: string;
+  category: CategoryKey;
+  city: string;
+  distanceKm: number;
+  address: string;
+  phone: string;
+  sponsored: boolean;
+  premium: boolean;
+  photoUrl?: string;
+  logoUrl?: string;
+  horaires?: Horaire[];
+  themeVisuel?: ThemeVisuel;
+  description?: string;
+  googleRating?: number;
+  googleReviewCount?: number;
+  promos: PromoItem[];
+};
+
 export const OFFERS: Offer[] = [
   {
     googleRating: 4.8,

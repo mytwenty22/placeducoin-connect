@@ -17,11 +17,13 @@ export function SponsorBanner({
   className?: string;
 }) {
   const inner = banner ? (
-    <img
-      src={banner.image_url}
-      alt="Bannière partenaire"
-      className="block h-[200px] w-full object-cover sm:h-[150px]"
-    />
+    <div className="flex h-[200px] w-full items-center justify-center bg-secondary sm:h-[150px]">
+      <img
+        src={banner.image_url}
+        alt="Bannière partenaire"
+        className="h-full w-full object-contain"
+      />
+    </div>
   ) : (
     <div className="flex h-[200px] w-full flex-col items-center justify-center gap-1.5 bg-gradient-navy px-4 text-center text-primary-foreground sm:h-[150px]">
       <span className="flex items-center gap-1.5 font-display text-base font-extrabold sm:text-lg">

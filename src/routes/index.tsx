@@ -7,7 +7,12 @@ import { SponsorBanner } from "@/components/SponsorBanner";
 import { BottomSponsorBanner } from "@/components/BottomSponsorBanner";
 import { OfferCard } from "@/components/OfferCard";
 import { RadiusSelector } from "@/components/RadiusSelector";
-import { CATEGORIES, type CategoryKey, type Offer } from "@/lib/placeducoin-data";
+import {
+  CATEGORIES,
+  type CategoryKey,
+  type CommerceListing,
+  type PromoItem,
+} from "@/lib/placeducoin-data";
 import { supabase } from "@/lib/supabase";
 import { normalizeSearch } from "@/lib/utils";
 import { withComputedDistance } from "@/lib/geo";
@@ -44,13 +49,24 @@ type PublicNotice = {
   date_info: string | null;
 };
 
-type CommerceEmbed = {
+type PromoEmbed = {
+  id: string;
+  titre: string;
+  kind: "promo" | "arrivage" | "evenement";
+  photo_url: string | null;
+  prix_avant: number | null;
+  prix_maintenant: number | null;
+  valide_jusqu_a: string;
+  created_at: string;
+};
+type CommerceRow = {
+  id: string;
+  slug: string;
   nom: string;
   trade: string;
   category: CategoryKey;
   adresse: string | null;
   telephone: string | null;
-  slug: string;
   photo_url: string | null;
   logo_url: string | null;
   description: string | null;
@@ -60,95 +76,92 @@ type CommerceEmbed = {
   boost_actif: boolean;
   google_rating: number | null;
   google_review_count: number | null;
-  villes?: { nom: string } | { nom: string }[] | null;
-};
-type PromoRow = {
-  id: string;
-  titre: string;
-  kind: "promo" | "arrivage" | "evenement";
-  photo_url: string | null;
-  prix_avant: number | null;
-  prix_maintenant: number | null;
-  valide_jusqu_a: string;
-  created_at: string;
-  commerces: CommerceEmbed | CommerceEmbed[];
+  promos: PromoEmbed[];
 };
 
-function unwrap<T>(value: T | T[] | null | undefined): T | null {
-  return Array.isArray(value) ? (value[0] ?? null) : (value ?? null);
-}
-
-function mapPromoToOffer(row: PromoRow, fallbackCity: string): (Offer & { id: string }) | null {
-  const commerce = unwrap(row.commerces);
-  if (!commerce) return null;
-  const villeEmbed = unwrap(commerce.villes);
-  const photoUrl = row.photo_url ?? commerce.photo_url;
+// Une offre est encore "active" tant que sa date de fin n'est pas passée -- la requête filtre
+// déjà côté serveur (`.gt("promos.valide_jusqu_a", …)`), ce second filtre ne fait que se prémunir
+// d'un léger décalage d'horloge entre le moment de la requête et le rendu.
+function mapPromoEmbed(row: PromoEmbed): PromoItem {
   const endsInHours = Math.max(
     0,
     Math.round((new Date(row.valide_jusqu_a).getTime() - Date.now()) / 3_600_000),
   );
   return {
     id: row.id,
-    slug: commerce.slug,
-    shop: commerce.nom,
-    trade: commerce.trade,
-    category: commerce.category,
-    city: villeEmbed?.nom ?? fallbackCity,
-    distanceKm: 0,
     title: row.titre,
     kind: row.kind,
     ...(row.prix_avant != null ? { priceBefore: row.prix_avant } : {}),
     ...(row.prix_maintenant != null ? { priceNow: row.prix_maintenant } : {}),
     endsInHours,
-    sponsored: commerce.boost_actif,
-    address: commerce.adresse ?? "",
-    phone: commerce.telephone ?? "",
-    hours: [],
-    services: [],
-    premium: commerce.site_actif,
-    ...(photoUrl ? { photoUrl } : {}),
-    ...(commerce.logo_url ? { logoUrl: commerce.logo_url } : {}),
-    ...(commerce.description ? { description: commerce.description } : {}),
     ...(row.kind === "evenement" ? { eventDate: row.valide_jusqu_a } : {}),
-    createdAt: row.created_at,
-    horaires: commerce.horaires,
-    themeVisuel: commerce.theme_visuel,
-    ...(commerce.google_rating != null ? { googleRating: commerce.google_rating } : {}),
-    ...(commerce.google_review_count != null
-      ? { googleReviewCount: commerce.google_review_count }
-      : {}),
+    ...(row.photo_url ? { photoUrl: row.photo_url } : {}),
   };
 }
 
-function sortActiveOffersFirst<
-  T extends { kind: string; sponsored?: boolean; endsInHours: number },
->(offers: T[]): T[] {
-  return [...offers].sort((a, b) => {
+// Tri des offres à l'intérieur du carrousel d'une même carte : événements après les offres à
+// durée limitée, puis la plus urgente (fin la plus proche) en premier.
+function sortPromos(promos: PromoEmbed[]): PromoEmbed[] {
+  return [...promos].sort((a, b) => {
     const aEvent = a.kind === "evenement" ? 1 : 0;
     const bEvent = b.kind === "evenement" ? 1 : 0;
     if (aEvent !== bEvent) return aEvent - bEvent;
-
-    const aFeatured = a.sponsored ? 0 : 1;
-    const bFeatured = b.sponsored ? 0 : 1;
-    if (aFeatured !== bFeatured) return aFeatured - bFeatured;
-
-    // Tri chronologique : expire/a lieu le plus tôt en premier.
-    return a.endsInHours - b.endsInHours;
+    return new Date(a.valide_jusqu_a).getTime() - new Date(b.valide_jusqu_a).getTime();
   });
 }
 
-// Second passage de tri, appliqué juste avant le .map() d'affichage : garantit que
-// les cartes "En Vedette" (is_featured / sponsored) sont TOUJOURS en tête, quoi qu'il
-// arrive en amont. Le tri étant stable, l'ordre chronologique déjà calculé par
-// sortActiveOffersFirst est conservé entre les cartes de même statut "vedette".
-function featuredFirst<T extends { sponsored?: boolean }>(items: T[]): T[] {
-  return [...items].sort((a, b) => {
-    const aFeatured = Boolean(a.sponsored);
-    const bFeatured = Boolean(b.sponsored);
-    if (aFeatured && !bFeatured) return -1;
-    if (!aFeatured && bFeatured) return 1;
-    return 0;
+function mapCommerceToListing(row: CommerceRow, fallbackCity: string): CommerceListing {
+  return {
+    id: row.id,
+    slug: row.slug,
+    shop: row.nom,
+    trade: row.trade,
+    category: row.category,
+    city: fallbackCity,
+    distanceKm: 0,
+    address: row.adresse ?? "",
+    phone: row.telephone ?? "",
+    sponsored: row.boost_actif,
+    premium: row.site_actif,
+    ...(row.photo_url ? { photoUrl: row.photo_url } : {}),
+    ...(row.logo_url ? { logoUrl: row.logo_url } : {}),
+    horaires: row.horaires,
+    themeVisuel: row.theme_visuel,
+    ...(row.description ? { description: row.description } : {}),
+    ...(row.google_rating != null ? { googleRating: row.google_rating } : {}),
+    ...(row.google_review_count != null ? { googleReviewCount: row.google_review_count } : {}),
+    promos: sortPromos(row.promos).map(mapPromoEmbed),
+  };
+}
+
+// Hiérarchie d'affichage de la marketplace : Vedette (boost_actif) en tête, puis Site Pro
+// (site_actif), puis les fiches gratuites. Un commerce avec une offre active en cours passe
+// avant les autres commerces du même rang, puis on retombe sur l'ordre alphabétique.
+function sortByTier(commerces: CommerceListing[]): CommerceListing[] {
+  function tier(c: CommerceListing): number {
+    if (c.sponsored) return 0;
+    if (c.premium) return 1;
+    return 2;
+  }
+  return [...commerces].sort((a, b) => {
+    const tierDiff = tier(a) - tier(b);
+    if (tierDiff !== 0) return tierDiff;
+    const hasPromoDiff = (b.promos.length > 0 ? 1 : 0) - (a.promos.length > 0 ? 1 : 0);
+    if (hasPromoDiff !== 0) return hasPromoDiff;
+    return a.shop.localeCompare(b.shop, "fr");
   });
+}
+
+function matchesSearch(commerce: CommerceListing, normalizedQuery: string): boolean {
+  const categoryLabel = CATEGORIES.find((c) => c.key === commerce.category)?.label ?? "";
+  const fields = [
+    commerce.shop,
+    commerce.trade,
+    categoryLabel,
+    commerce.description ?? "",
+    ...commerce.promos.map((p) => p.title),
+  ];
+  return fields.some((f) => normalizeSearch(f).includes(normalizedQuery));
 }
 
 function Marketplace() {
@@ -186,88 +199,45 @@ function Marketplace() {
 
   const city = selectedVille?.nom ?? "";
 
-  const featuredQuery = useQuery({
-    queryKey: ["promos-featured", selectedVille?.id, category],
-    queryFn: async () => {
-      let queryBuilder = supabase
-        .from("promos")
-        .select(
-          "id, titre, kind, photo_url, prix_avant, prix_maintenant, valide_jusqu_a, created_at, commerces!inner(nom, trade, category, adresse, telephone, slug, photo_url, logo_url, description, horaires, theme_visuel, site_actif, boost_actif, google_rating, google_review_count, ville_id, villes(nom))",
-        )
-        .eq("commerces.ville_id", selectedVille?.id)
-        .in("kind", ["promo", "arrivage", "evenement"])
-        .gt("valide_jusqu_a", new Date().toISOString());
-      if (category) {
-        queryBuilder = queryBuilder.eq("commerces.category", category);
-      }
-      const { data, error } = await queryBuilder.order("created_at", { ascending: false }).limit(3);
-      if (error) throw error;
-      return (data as unknown as PromoRow[])
-        .map((row) => mapPromoToOffer(row, city))
-        .filter((o): o is Offer & { id: string } => o !== null);
-    },
-    enabled: !!selectedVille,
-  });
-
-  const sponsoredAll = sortActiveOffersFirst(featuredQuery.data ?? []);
-  const sponsoredWithDistance = withComputedDistance(sponsoredAll, position);
-  const sponsored = hasPosition
-    ? sponsoredWithDistance.filter((o) => o.distanceKm <= radiusKm)
-    : sponsoredWithDistance;
-
-  useVedetteAlerts(sponsoredWithDistance, { radiusKm, favoriteCategories, hasPosition });
-
-  const offersQuery = useQuery({
-    queryKey: ["promos-marketplace", selectedVille?.id],
+  // Annuaire général : tous les commerces de la ville sont chargés (pas seulement ceux qui ont
+  // une promo en cours), avec leurs éventuelles offres actives embarquées via `promos(…)`. Le
+  // filtre `.gt("promos.valide_jusqu_a", …)` ne restreint que le tableau embarqué -- sans
+  // `!inner`, PostgREST garde la ligne commerce même quand ce tableau ressort vide.
+  const commercesQuery = useQuery({
+    queryKey: ["commerces-marketplace", selectedVille?.id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("promos")
+        .from("commerces")
         .select(
-          "id, titre, kind, photo_url, prix_avant, prix_maintenant, valide_jusqu_a, created_at, commerces!inner(nom, trade, category, adresse, telephone, slug, photo_url, logo_url, description, horaires, theme_visuel, site_actif, boost_actif, google_rating, google_review_count, ville_id)",
+          "id, slug, nom, trade, category, adresse, telephone, photo_url, logo_url, description, horaires, theme_visuel, site_actif, boost_actif, google_rating, google_review_count, promos(id, titre, kind, photo_url, prix_avant, prix_maintenant, valide_jusqu_a, created_at)",
         )
-        .eq("commerces.ville_id", selectedVille?.id)
-        .in("kind", ["promo", "arrivage", "evenement"])
-        .gt("valide_jusqu_a", new Date().toISOString())
-        .order("created_at", { ascending: false });
+        .eq("ville_id", selectedVille?.id)
+        .gt("promos.valide_jusqu_a", new Date().toISOString());
       if (error) throw error;
-      return (data as unknown as PromoRow[])
-        .map((row) => mapPromoToOffer(row, city))
-        .filter((o): o is Offer & { id: string } => o !== null);
+      return (data as unknown as CommerceRow[]).map((row) => mapCommerceToListing(row, city));
     },
     enabled: !!selectedVille,
   });
+
+  const commercesWithDistance = withComputedDistance(commercesQuery.data ?? [], position);
+  useVedetteAlerts(commercesWithDistance, { radiusKm, favoriteCategories, hasPosition });
 
   const searchQuery = normalizeSearch(query);
   const isSearching = searchQuery.length > 0;
 
   const filtered = useMemo(() => {
-    const data = offersQuery.data ?? [];
+    const data = commercesQuery.data ?? [];
     if (isSearching) {
-      return sortActiveOffersFirst(
-        data.filter((o) => {
-          const categoryLabel = CATEGORIES.find((c) => c.key === o.category)?.label ?? "";
-          const fields = [o.shop, o.trade, categoryLabel, o.title, o.description ?? ""];
-          return fields.some((f) => normalizeSearch(f).includes(searchQuery));
-        }),
-      );
+      return sortByTier(data.filter((c) => matchesSearch(c, searchQuery)));
     }
-    if (category === null) return sortActiveOffersFirst(data);
-    return sortActiveOffersFirst(data.filter((o) => o.category === category));
-  }, [offersQuery.data, isSearching, searchQuery, category]);
+    if (category === null) return sortByTier(data);
+    return sortByTier(data.filter((c) => c.category === category));
+  }, [commercesQuery.data, isSearching, searchQuery, category]);
 
   const filteredWithDistance = withComputedDistance(filtered, position);
-  const visibleOffers = hasPosition
-    ? filteredWithDistance.filter((o) => o.distanceKm <= radiusKm)
+  const visibleCommerces = hasPosition
+    ? filteredWithDistance.filter((c) => c.distanceKm <= radiusKm)
     : filteredWithDistance;
-
-  const activeOffersCountBySlug = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const o of offersQuery.data ?? []) {
-      if (o.kind === "evenement") continue;
-      map.set(o.slug, (map.get(o.slug) ?? 0) + 1);
-    }
-    return map;
-  }, [offersQuery.data]);
 
   const noticesQuery = useQuery({
     queryKey: ["infos-mairie-public", selectedVille?.id],
@@ -460,13 +430,13 @@ function Marketplace() {
               Résultats pour « {query.trim()} »
             </h2>
             <span className="rounded-full bg-promo/10 px-2 py-1 text-[11px] font-bold uppercase text-promo">
-              {visibleOffers.length} résultat{visibleOffers.length > 1 ? "s" : ""}
+              {visibleCommerces.length} résultat{visibleCommerces.length > 1 ? "s" : ""}
             </span>
           </div>
 
-          {offersQuery.isLoading ? (
+          {commercesQuery.isLoading ? (
             <p className="mt-4 text-sm text-muted-foreground">Chargement…</p>
-          ) : visibleOffers.length === 0 ? (
+          ) : visibleCommerces.length === 0 ? (
             <div className="mt-6 flex flex-col items-center gap-3 py-8 text-center">
               <p className="text-sm text-muted-foreground">Aucun commerce trouvé.</p>
               <button
@@ -479,81 +449,50 @@ function Marketplace() {
             </div>
           ) : (
             <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {featuredFirst(visibleOffers).map((o) => (
-                <OfferCard
-                  key={o.id}
-                  offer={o}
-                  activeOffersCount={activeOffersCountBySlug.get(o.slug) ?? 1}
-                />
+              {visibleCommerces.map((c) => (
+                <OfferCard key={c.id} commerce={c} />
               ))}
             </div>
           )}
         </section>
       ) : (
-        <>
-          {/* À la une / sponsorisé */}
-          <section className="mx-auto max-w-6xl px-4 py-8">
-            <div className="flex items-center gap-2">
-              <h2 className="font-display text-xl font-extrabold text-foreground">À la Une</h2>
-              <span className="rounded-full bg-promo/10 px-2 py-1 text-[11px] font-bold uppercase text-promo">
-                Nouveautés
-              </span>
-            </div>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {featuredFirst(sponsored).map((o) => (
-                <OfferCard
-                  key={o.id}
-                  offer={o}
-                  activeOffersCount={activeOffersCountBySlug.get(o.slug) ?? 1}
+        /* Un seul flux, trié par rang (Vedette > Site Pro > gratuit) : chaque commerce
+           n'apparaît qu'une fois, ses éventuelles offres actives défilent dans sa carte. */
+        <section className="mx-auto max-w-6xl px-4 pb-12">
+          {category === "locale" && notices.length > 0 ? (
+            <div className="mb-6 grid gap-4 sm:grid-cols-2">
+              {notices.map((n) => (
+                <NoticeCard
+                  key={n.id}
+                  title={n.titre}
+                  body={n.corps ?? ""}
+                  date={n.date_info ?? ""}
+                  type={n.type}
                 />
               ))}
-              {!featuredQuery.isLoading && sponsored.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Aucune promo active pour le moment.</p>
-              ) : null}
             </div>
-          </section>
+          ) : null}
 
-          {/* Liste des commerces de la catégorie sélectionnée */}
-          <section className="mx-auto max-w-6xl px-4 pb-12">
-            {category === "locale" && notices.length > 0 ? (
-              <div className="grid gap-4 sm:grid-cols-2">
-                {notices.map((n) => (
-                  <NoticeCard
-                    key={n.id}
-                    title={n.titre}
-                    body={n.corps ?? ""}
-                    date={n.date_info ?? ""}
-                    type={n.type}
-                  />
-                ))}
-              </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {visibleCommerces.map((c) => (
+              <OfferCard key={c.id} commerce={c} />
+            ))}
+            {commercesQuery.isLoading ? (
+              <p className="text-sm text-muted-foreground">Chargement…</p>
             ) : null}
-
-            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {featuredFirst(visibleOffers).map((o) => (
-                <OfferCard
-                  key={o.id}
-                  offer={o}
-                  activeOffersCount={activeOffersCountBySlug.get(o.slug) ?? 1}
-                />
-              ))}
-              {offersQuery.isLoading ? (
-                <p className="text-sm text-muted-foreground">Chargement…</p>
-              ) : null}
-              {!offersQuery.isLoading &&
-              visibleOffers.length === 0 &&
-              !(category === "locale" && notices.length > 0) ? (
-                <p className="col-span-full text-sm text-muted-foreground">
-                  {category === null
-                    ? hasPosition
-                      ? `Aucun commerce à moins de ${radiusKm} km à ${city}.`
-                      : `Aucun commerce à ${city} pour le moment.`
-                    : "Aucun commerce dans cette catégorie pour le moment."}
-                </p>
-              ) : null}
-            </div>
-          </section>
-        </>
+            {!commercesQuery.isLoading &&
+            visibleCommerces.length === 0 &&
+            !(category === "locale" && notices.length > 0) ? (
+              <p className="col-span-full text-sm text-muted-foreground">
+                {category === null
+                  ? hasPosition
+                    ? `Aucun commerce à moins de ${radiusKm} km à ${city}.`
+                    : `Aucun commerce à ${city} pour le moment.`
+                  : "Aucun commerce dans cette catégorie pour le moment."}
+              </p>
+            ) : null}
+          </div>
+        </section>
       )}
 
       {/* Bloc Mairie */}
