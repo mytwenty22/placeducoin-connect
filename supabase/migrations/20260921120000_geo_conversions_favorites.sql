@@ -14,6 +14,40 @@ alter table public.commerces add constraint commerces_coordinates_check check (
   or (latitude between -90 and 90 and longitude between -180 and 180)
 );
 
+-- ── Anciennes versions de ces objets ──────────────────────────────────────────────────────────
+-- Une première ébauche de ces tables/fonction existait déjà dans la base (créée hors du dépôt) avec
+-- une autre forme : promo_activations sans expires_at/distance_m, favoris avec une colonne id, et
+-- commerce_conversion_stats avec un autre type de retour. `create table if not exists` les aurait
+-- laissées telles quelles et `create or replace function` aurait échoué. On les remplace, mais
+-- seulement si elles sont vides : s'il y a des données, on s'arrête plutôt que de les détruire.
+do $$
+begin
+  if to_regclass('public.promo_activations') is not null
+     and not exists (
+       select 1 from information_schema.columns
+       where table_schema = 'public' and table_name = 'promo_activations' and column_name = 'expires_at'
+     ) then
+    if exists (select 1 from public.promo_activations) then
+      raise exception 'public.promo_activations (ancienne forme) contient des lignes : à migrer manuellement.';
+    end if;
+    drop table public.promo_activations;
+  end if;
+
+  if to_regclass('public.favoris') is not null
+     and exists (
+       select 1 from information_schema.columns
+       where table_schema = 'public' and table_name = 'favoris' and column_name = 'id'
+     ) then
+    if exists (select 1 from public.favoris) then
+      raise exception 'public.favoris (ancienne forme) contient des lignes : à migrer manuellement.';
+    end if;
+    drop table public.favoris;
+  end if;
+end
+$$;
+
+drop function if exists public.commerce_conversion_stats(uuid);
+
 -- ── Activations de promo en caisse ────────────────────────────────────────────────────────────
 -- Une ligne = une "conversion" : un client connecté présent en boutique a activé une promo.
 -- promo_id passe à NULL si le commerçant supprime la promo ensuite (on garde ainsi l'historique
@@ -165,6 +199,8 @@ as $$
   order by count(*) desc, max(a.created_at) desc;
 $$;
 
+revoke all on function public.commerce_conversion_stats(uuid) from public;
+revoke all on function public.commerce_conversion_stats(uuid) from anon;
 grant execute on function public.commerce_conversion_stats(uuid) to authenticated;
 
 -- ── Favoris ───────────────────────────────────────────────────────────────────────────────────
