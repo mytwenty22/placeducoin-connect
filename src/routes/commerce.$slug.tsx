@@ -4,6 +4,9 @@ import { Phone, Navigation, Clock, Flame } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { GoogleRatingStars } from "@/components/GoogleRatingStars";
 import { CouponButton } from "@/components/CouponButton";
+import { ActivateOfferButton } from "@/components/ActivateOfferButton";
+import { FavoriteButton } from "@/components/FavoriteButton";
+import { InstallAppBanner } from "@/components/InstallAppBanner";
 import { getOffer, type CategoryKey, type Offer } from "@/lib/placeducoin-data";
 import { supabase } from "@/lib/supabase";
 import { logStatEvent, isFromGoogleReferrer } from "@/lib/stats-tracking";
@@ -13,7 +16,7 @@ async function loadRealOffer(slug: string): Promise<Offer | null> {
   const { data: commerce } = await supabase
     .from("commerces")
     .select(
-      "id, nom, trade, category, adresse, telephone, photo_url, site_actif, google_rating, google_review_count, horaires, villes(nom)",
+      "id, nom, trade, category, adresse, telephone, photo_url, site_actif, google_rating, google_review_count, horaires, latitude, longitude, villes(nom)",
     )
     .eq("slug", slug)
     .maybeSingle();
@@ -45,6 +48,7 @@ async function loadRealOffer(slug: string): Promise<Offer | null> {
     title: promo?.titre ?? "",
     kind: promo?.kind ?? "promo",
     commerceId: commerce.id,
+    hasLocation: commerce.latitude != null && commerce.longitude != null,
     ...(promo?.id ? { promoId: promo.id } : {}),
     ...(promo?.prix_avant != null ? { priceBefore: promo.prix_avant } : {}),
     ...(promo?.prix_maintenant != null ? { priceNow: promo.prix_maintenant } : {}),
@@ -141,6 +145,10 @@ function ShopSite() {
             >
               <Navigation className="h-4 w-4" /> Itinéraire
             </a>
+            <FavoriteButton
+              commerceId={offer.commerceId}
+              className="bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+            />
           </div>
         </div>
       </header>
@@ -171,7 +179,14 @@ function ShopSite() {
               </div>
             </div>
             {offer.kind !== "evenement" && offer.promoId ? (
-              <div className="px-5 py-4">
+              <div className="flex flex-col items-start gap-3 px-5 py-4">
+                {offer.hasLocation ? (
+                  <ActivateOfferButton
+                    promoId={offer.promoId}
+                    shopName={offer.shop}
+                    promoTitle={offer.title}
+                  />
+                ) : null}
                 <CouponButton commerceId={offer.commerceId} />
               </div>
             ) : null}
@@ -246,6 +261,8 @@ function ShopSite() {
           </section>
         </div>
       </main>
+
+      <InstallAppBanner />
     </div>
   );
 }

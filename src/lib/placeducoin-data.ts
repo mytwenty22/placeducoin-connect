@@ -57,6 +57,9 @@ export type Offer = {
   premium?: boolean;
   commerceId?: string;
   promoId?: string;
+  // Vrai quand le commerçant a renseigné la position GPS de sa boutique : condition pour proposer
+  // « Profiter de cette offre en caisse » (activation vérifiée dans un rayon de 100 m).
+  hasLocation?: boolean;
   photoUrl?: string;
   logoUrl?: string;
   horaires?: Horaire[];

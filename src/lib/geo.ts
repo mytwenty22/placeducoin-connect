@@ -66,3 +66,62 @@ export function withComputedDistance<T extends { slug: string; city: string; dis
     distanceKm: Math.round(haversineKm(position, derivePosition(offer.slug, offer.city)) * 10) / 10,
   }));
 }
+
+export type PositionErrorKind = "unsupported" | "denied" | "unavailable" | "timeout";
+
+export class GeoPositionError extends Error {
+  readonly kind: PositionErrorKind;
+  constructor(kind: PositionErrorKind) {
+    super(kind);
+    this.kind = kind;
+  }
+}
+
+export type PreciseLatLng = LatLng & { accuracyM: number };
+
+/**
+ * Une lecture GPS "fraîche" (jamais mise en cache) pour les actions où la position sert de
+ * preuve de présence -- activation d'une promo en caisse, ou enregistrement de la position d'une
+ * boutique. useGeolocation, lui, accepte une position vieille de 5 min et peu précise, ce qui
+ * convient pour trier la marketplace par distance mais pas pour valider un rayon de 100 m.
+ */
+export function getCurrentPositionOnce(): Promise<PreciseLatLng> {
+  return new Promise((resolve, reject) => {
+    if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
+      reject(new GeoPositionError("unsupported"));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) =>
+        resolve({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracyM: pos.coords.accuracy,
+        }),
+      (err) =>
+        reject(
+          new GeoPositionError(
+            err.code === err.PERMISSION_DENIED
+              ? "denied"
+              : err.code === err.TIMEOUT
+                ? "timeout"
+                : "unavailable",
+          ),
+        ),
+      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 0 },
+    );
+  });
+}
+
+export function positionErrorMessage(kind: PositionErrorKind): string {
+  switch (kind) {
+    case "unsupported":
+      return "La géolocalisation n'est pas disponible sur cet appareil.";
+    case "denied":
+      return "Autorisez l'accès à votre position dans les réglages du navigateur, puis réessayez.";
+    case "timeout":
+      return "Votre position n'a pas pu être obtenue à temps. Réessayez, GPS activé.";
+    default:
+      return "Votre position est indisponible pour le moment. Réessayez, GPS activé.";
+  }
+}

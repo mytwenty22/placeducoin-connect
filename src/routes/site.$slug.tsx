@@ -4,6 +4,9 @@ import { Phone, Navigation, Clock, MapPin, CalendarDays, Instagram, Package } fr
 import { BackButton } from "@/components/BackButton";
 import { GoogleRatingStars } from "@/components/GoogleRatingStars";
 import { CouponButton } from "@/components/CouponButton";
+import { ActivateOfferButton } from "@/components/ActivateOfferButton";
+import { FavoriteButton } from "@/components/FavoriteButton";
+import { InstallAppBanner } from "@/components/InstallAppBanner";
 import { supabase } from "@/lib/supabase";
 import { computeOpenStatus, type Horaire } from "@/lib/horaires";
 import { getReadableTextColor } from "@/lib/color";
@@ -28,6 +31,8 @@ type SiteCommerce = {
   site_actif: boolean;
   google_rating: number | null;
   google_review_count: number | null;
+  latitude: number | null;
+  longitude: number | null;
 };
 
 type SitePromo = {
@@ -64,7 +69,7 @@ export const Route = createFileRoute("/site/$slug")({
     const { data: commerce } = await supabase
       .from("commerces")
       .select(
-        "id, slug, nom, trade, adresse, telephone, photo_url, logo_url, description, horaires, instagram, galerie_urls, video_url, theme_visuel, site_actif, google_rating, google_review_count",
+        "id, slug, nom, trade, adresse, telephone, photo_url, logo_url, description, horaires, instagram, galerie_urls, video_url, theme_visuel, site_actif, google_rating, google_review_count, latitude, longitude",
       )
       .eq("slug", params.slug)
       .maybeSingle();
@@ -297,6 +302,10 @@ function StandaloneSite() {
                 <Navigation className="h-4 w-4" /> Itinéraire
               </a>
             ) : null}
+            <FavoriteButton
+              commerceId={commerce.id}
+              className="border-2 border-white/30 bg-white/5 rounded-full font-bold text-white backdrop-blur-sm hover:bg-white/10"
+            />
           </div>
         </div>
       </header>
@@ -339,43 +348,54 @@ function StandaloneSite() {
                 </h2>
                 <div className={`mt-3 divide-y ${dividerClass}`}>
                   {promos.map((p) => (
-                    <div key={p.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-                      {p.photo_url ? (
-                        <img
-                          src={p.photo_url}
-                          alt=""
-                          loading="lazy"
-                          decoding="async"
-                          className="h-14 w-14 shrink-0 rounded-xl bg-slate-50 object-contain"
+                    <div key={p.id} className="py-3 first:pt-0 last:pb-0">
+                      <div className="flex items-center gap-3">
+                        {p.photo_url ? (
+                          <img
+                            src={p.photo_url}
+                            alt=""
+                            loading="lazy"
+                            decoding="async"
+                            className="h-14 w-14 shrink-0 rounded-xl bg-slate-50 object-contain"
+                          />
+                        ) : null}
+                        <div className="min-w-0 flex-1">
+                          <p className={`truncate text-sm font-semibold ${headingClass}`}>
+                            {p.titre}
+                          </p>
+                          <p className={`text-xs ${mutedClass}`}>
+                            Jusqu'au{" "}
+                            {new Date(p.valide_jusqu_a).toLocaleString("fr-FR", {
+                              day: "numeric",
+                              month: "short",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </p>
+                        </div>
+                        {p.prix_maintenant != null ? (
+                          <div className="shrink-0 text-right">
+                            <p className="font-display text-lg font-extrabold text-promo">
+                              {p.prix_maintenant.toFixed(2)} €
+                            </p>
+                            {p.prix_avant != null ? (
+                              <p className={`text-xs line-through ${mutedClass}`}>
+                                {p.prix_avant.toFixed(2)} €
+                              </p>
+                            ) : null}
+                          </div>
+                        ) : null}
+                        <CouponButton commerceId={commerce.id} compact className="shrink-0" />
+                      </div>
+                      {commerce.latitude != null && commerce.longitude != null ? (
+                        <ActivateOfferButton
+                          promoId={p.id}
+                          shopName={commerce.nom}
+                          promoTitle={p.titre}
+                          compact
+                          className="mt-2"
                         />
                       ) : null}
-                      <div className="min-w-0 flex-1">
-                        <p className={`truncate text-sm font-semibold ${headingClass}`}>
-                          {p.titre}
-                        </p>
-                        <p className={`text-xs ${mutedClass}`}>
-                          Jusqu'au{" "}
-                          {new Date(p.valide_jusqu_a).toLocaleString("fr-FR", {
-                            day: "numeric",
-                            month: "short",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </p>
-                      </div>
-                      {p.prix_maintenant != null ? (
-                        <div className="shrink-0 text-right">
-                          <p className="font-display text-lg font-extrabold text-promo">
-                            {p.prix_maintenant.toFixed(2)} €
-                          </p>
-                          {p.prix_avant != null ? (
-                            <p className={`text-xs line-through ${mutedClass}`}>
-                              {p.prix_avant.toFixed(2)} €
-                            </p>
-                          ) : null}
-                        </div>
-                      ) : null}
-                      <CouponButton commerceId={commerce.id} compact className="shrink-0" />
                     </div>
                   ))}
                 </div>
@@ -554,6 +574,8 @@ function StandaloneSite() {
           Conditions Générales de Vente & Mentions Légales
         </Link>
       </footer>
+
+      <InstallAppBanner />
     </div>
   );
 }

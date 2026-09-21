@@ -384,6 +384,12 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+[functions.stripe-webhook]
+# Stripe appelle ce endpoint sans JWT Supabase (il envoie sa propre signature `stripe-signature`,
+# vérifiée dans la fonction elle-même) : la vérification JWT par défaut le rejetterait avant même
+# d'atteindre le code.
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

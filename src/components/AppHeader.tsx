@@ -1,6 +1,6 @@
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Store, Building2, LayoutGrid, LogOut } from "lucide-react";
+import { Store, Building2, LayoutGrid, LogOut, Heart } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import { BackButton } from "@/components/BackButton";
 import { RadiusSelector } from "@/components/RadiusSelector";
@@ -12,6 +12,7 @@ const NAV = [
   { to: "/", label: "Marketplace", icon: LayoutGrid },
   { to: "/pro", label: "Espace Pro", icon: Store },
   { to: "/mairie", label: "Espace Mairie", icon: Building2 },
+  { to: "/compte", label: "Mon compte", icon: Heart },
 ] as const;
 
 export function AppHeader() {

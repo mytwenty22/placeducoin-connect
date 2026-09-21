@@ -30,6 +30,10 @@ import { AppHeader } from "@/components/AppHeader";
 import { EmailPasswordLogin } from "@/components/EmailPasswordLogin";
 import { SponsorBanner } from "@/components/SponsorBanner";
 import { OfferCard } from "@/components/OfferCard";
+import { ConversionStats } from "@/components/ConversionStats";
+import { PosterButton } from "@/components/PosterButton";
+import { ShopLocationField } from "@/components/ShopLocationField";
+import { geocodeAddress } from "@/lib/geocode";
 import { supabase } from "@/lib/supabase";
 import { addNotification } from "@/lib/notifications-store";
 import { slugify } from "@/lib/slugify";
@@ -72,6 +76,8 @@ type Commerce = {
   ville_id: string;
   adresse: string | null;
   code_postal: string | null;
+  latitude: number | null;
+  longitude: number | null;
   telephone: string | null;
   photo_url: string | null;
   logo_url: string | null;
@@ -349,7 +355,7 @@ function ProDashboard({ userId }: { userId: string }) {
       const { data, error } = await supabase
         .from("commerces")
         .select(
-          "id, slug, nom, trade, category, ville_id, adresse, code_postal, telephone, photo_url, logo_url, description, horaires, instagram, galerie_urls, video_url, theme_visuel, site_actif, boost_actif, boost_expires_at",
+          "id, slug, nom, trade, category, ville_id, adresse, code_postal, latitude, longitude, telephone, photo_url, logo_url, description, horaires, instagram, galerie_urls, video_url, theme_visuel, site_actif, boost_actif, boost_expires_at",
         )
         .eq("owner_id", userId)
         .maybeSingle();
@@ -389,13 +395,18 @@ function ProDashboard({ userId }: { userId: string }) {
   const cancelMutation = useMutation({
     mutationFn: async (field: "site_actif" | "boost_actif") => {
       if (!commerceQuery.data) throw new Error("Commerce introuvable.");
-      const patch =
-        field === "boost_actif"
-          ? { boost_actif: false, boost_expires_at: null }
-          : { site_actif: false };
+      if (field === "site_actif") {
+        // Passe par la fonction serveur plutôt qu'un simple update : un abonnement réellement
+        // payé via Stripe doit aussi être annulé côté Stripe (sinon la facturation continue en
+        // arrière-plan). La fonction se rabat sur un simple flag si l'activation était gratuite
+        // (mode démo, sans stripe_subscription_id).
+        const { error } = await supabase.functions.invoke("cancel-subscription");
+        if (error) throw new Error(error.message);
+        return;
+      }
       const { error } = await supabase
         .from("commerces")
-        .update(patch)
+        .update({ boost_actif: false, boost_expires_at: null })
         .eq("id", commerceQuery.data.id);
       if (error) throw new Error(error.message);
     },
@@ -404,6 +415,18 @@ function ProDashboard({ userId }: { userId: string }) {
       toast.success(
         field === "site_actif" ? "Abonnement Site Pro annulé." : "Option Vedette annulée.",
       );
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const checkoutMutation = useMutation({
+    mutationFn: async (type: "site_pro" | "boost") => {
+      const { data, error } = await supabase.functions.invoke("create-checkout-session", {
+        body: { type },
+      });
+      if (error) throw new Error(error.message);
+      if (!data?.url) throw new Error("Session de paiement Stripe invalide.");
+      window.location.href = data.url;
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -490,6 +513,10 @@ function ProDashboard({ userId }: { userId: string }) {
         </Link>
       ) : null}
 
+      <div className="mt-3">
+        <PosterButton commerce={commerce} />
+      </div>
+
       <div className="mt-6">
         {screen === "profil" ? (
           <ProfileScreen
@@ -510,7 +537,9 @@ function ProDashboard({ userId }: { userId: string }) {
         {screen === "catalogue" ? (
           <CatalogueScreen userId={userId} commerceId={commerce.id} />
         ) : null}
-        {screen === "stats" ? <StatsScreen commerceId={commerce.id} /> : null}
+        {screen === "stats" ? (
+          <StatsScreen commerce={commerce} onGoToProfile={() => setScreen("profil")} />
+        ) : null}
         {screen === "options" ? (
           <OptionsScreen
             commerce={commerce}
@@ -518,10 +547,13 @@ function ProDashboard({ userId }: { userId: string }) {
             accountType={accountType}
             pending={activateMutation.isPending}
             cancelPending={cancelMutation.isPending}
+            checkoutPending={checkoutMutation.isPending}
             onActivateSite={() => activateMutation.mutate("site_actif")}
             onActivateBoost={() => activateMutation.mutate("boost_actif")}
             onCancelSite={() => cancelMutation.mutate("site_actif")}
             onCancelBoost={() => cancelMutation.mutate("boost_actif")}
+            onCheckoutSite={() => checkoutMutation.mutate("site_pro")}
+            onCheckoutBoost={() => checkoutMutation.mutate("boost")}
           />
         ) : null}
       </div>
@@ -590,6 +622,8 @@ async function insertCommerceWithUniqueSlug(input: {
   adresse: string;
   code_postal: string;
   telephone: string;
+  latitude?: number;
+  longitude?: number;
 }) {
   const baseSlug = slugify(input.nom) || "commerce";
   for (let attempt = 0; attempt < 6; attempt++) {
@@ -646,6 +680,10 @@ function CreateCommerceForm({
         }
         setPending(true);
         try {
+          // Position GPS déduite de l'adresse pour l'activation des promos en caisse ; sans
+          // résultat fiable la fiche est créée quand même, le commerçant la renseignera depuis
+          // Mon Profil.
+          const position = await geocodeAddress(adresse, codePostal);
           await insertCommerceWithUniqueSlug({
             owner_id: userId,
             ville_id: villeId,
@@ -655,6 +693,7 @@ function CreateCommerceForm({
             adresse,
             code_postal: codePostal.trim(),
             telephone,
+            ...(position ? { latitude: position.lat, longitude: position.lng } : {}),
           });
           onCreated();
         } catch (error) {
@@ -1327,6 +1366,14 @@ function ProfileScreen({
           onChange={(v) => setCodePostal(v.replace(/[^\d]/g, "").slice(0, 5))}
           placeholder="74000"
         />
+        <ShopLocationField
+          commerceId={commerce.id}
+          adresse={adresse}
+          codePostal={codePostal}
+          latitude={commerce.latitude}
+          longitude={commerce.longitude}
+          onUpdated={onUpdated}
+        />
         <Field label="Téléphone" value={telephone} onChange={setTelephone} />
         <Field
           label="Lien du compte Instagram"
@@ -1833,7 +1880,14 @@ const STAT_TILES = [
   },
 ];
 
-function StatsScreen({ commerceId }: { commerceId: string }) {
+function StatsScreen({
+  commerce,
+  onGoToProfile,
+}: {
+  commerce: Commerce;
+  onGoToProfile: () => void;
+}) {
+  const commerceId = commerce.id;
   const statsQuery = useQuery({
     queryKey: ["commerce-stats", commerceId],
     queryFn: async () => {
@@ -1887,6 +1941,12 @@ function StatsScreen({ commerceId }: { commerceId: string }) {
         offre ; Coupons Validés quand vous confirmez son utilisation en caisse depuis l'onglet Promo
         Flash.
       </p>
+
+      <ConversionStats
+        commerceId={commerceId}
+        hasLocation={commerce.latitude !== null && commerce.longitude !== null}
+        onGoToProfile={onGoToProfile}
+      />
     </div>
   );
 }
@@ -2105,6 +2165,24 @@ function BannerReservationCard({ commerce, userId }: { commerce: Commerce; userI
       queryClient.invalidateQueries({ queryKey: ["banner-reservations", commerce.id] });
       queryClient.invalidateQueries({ queryKey: ["banner-active-count", departmentCode] });
       toast.success("Réservation annulée — la place est immédiatement libérée.");
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const checkoutMutation = useMutation({
+    mutationFn: async () => {
+      const imageUrl = bannerImageUrl.trim() || commerce.logo_url || commerce.photo_url;
+      if (!imageUrl) {
+        throw new Error(
+          "Ajoutez une image pour la bannière, ou une photo/logo à votre fiche (onglet Mon Profil), avant de payer.",
+        );
+      }
+      const { data, error } = await supabase.functions.invoke("create-checkout-session", {
+        body: { type: "banner", position, tier, monthKey, imageUrl },
+      });
+      if (error) throw new Error(error.message);
+      if (!data?.url) throw new Error("Session de paiement Stripe invalide.");
+      window.location.href = data.url;
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -2350,10 +2428,11 @@ function BannerReservationCard({ commerce, userId }: { commerce: Commerce; userI
             <div className="space-y-2">
               <button
                 type="button"
-                onClick={() => toast(`Paiement Stripe non configuré dans cette démo (${price} €).`)}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-promo py-3 text-sm font-bold text-promo-foreground"
+                disabled={checkoutMutation.isPending}
+                onClick={() => checkoutMutation.mutate()}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-promo py-3 text-sm font-bold text-promo-foreground disabled:opacity-60"
               >
-                Payer {price} € via Stripe
+                {checkoutMutation.isPending ? "Redirection…" : `Payer ${price} € via Stripe`}
               </button>
               <button
                 type="button"
@@ -2377,20 +2456,26 @@ function OptionsScreen({
   accountType,
   pending,
   cancelPending,
+  checkoutPending,
   onActivateSite,
   onActivateBoost,
   onCancelSite,
   onCancelBoost,
+  onCheckoutSite,
+  onCheckoutBoost,
 }: {
   commerce: Commerce;
   userId: string;
   accountType: AccountType;
   pending: boolean;
   cancelPending: boolean;
+  checkoutPending: boolean;
   onActivateSite: () => void;
   onActivateBoost: () => void;
   onCancelSite: () => void;
   onCancelBoost: () => void;
+  onCheckoutSite: () => void;
+  onCheckoutBoost: () => void;
 }) {
   const boostExpiresAt = commerce.boost_expires_at ? new Date(commerce.boost_expires_at) : null;
   const boostActive = isBoostActive(commerce);
@@ -2432,10 +2517,11 @@ function OptionsScreen({
           <div className="mt-4 space-y-2">
             <button
               type="button"
-              onClick={() => toast("Paiement Stripe non configuré dans cette démo.")}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground"
+              disabled={checkoutPending}
+              onClick={onCheckoutSite}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground disabled:opacity-60"
             >
-              S'abonner via Stripe
+              {checkoutPending ? "Redirection…" : "S'abonner via Stripe"}
             </button>
             <button
               type="button"
@@ -2496,10 +2582,15 @@ function OptionsScreen({
           <div className="mt-4 space-y-2">
             <button
               type="button"
-              onClick={() => toast("Paiement Stripe non configuré dans cette démo.")}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-promo py-3 text-sm font-bold text-promo-foreground"
+              disabled={checkoutPending}
+              onClick={onCheckoutBoost}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-promo py-3 text-sm font-bold text-promo-foreground disabled:opacity-60"
             >
-              {vipEligible ? "Booster à la Une — 9 € via Stripe" : "Payer 9 € via Stripe"}
+              {checkoutPending
+                ? "Redirection…"
+                : vipEligible
+                  ? "Booster à la Une — 9 € via Stripe"
+                  : "Payer 9 € via Stripe"}
             </button>
             <button
               type="button"
