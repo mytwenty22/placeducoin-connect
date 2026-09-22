@@ -9,6 +9,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useNotifications, markAllRead, markRead } from "@/lib/notifications-store";
+import { useDbNotifications } from "@/hooks/use-db-notifications";
 
 function relativeTime(iso: string): string {
   const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60_000);
@@ -21,8 +22,29 @@ function relativeTime(iso: string): string {
 
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
-  const notifications = useNotifications();
-  const unread = notifications.filter((n) => !n.read).length;
+  const localNotifications = useNotifications();
+  const {
+    notifications: dbNotifications,
+    markRead: markDbRead,
+    markAllRead: markAllDbRead,
+  } = useDbNotifications();
+
+  const merged = [
+    ...localNotifications.map((n) => ({ ...n, source: "local" as const })),
+    ...dbNotifications.map((n) => ({ ...n, source: "db" as const })),
+  ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  const unread = merged.filter((n) => !n.read).length;
+
+  function handleClick(id: string, source: "local" | "db") {
+    if (source === "local") markRead(id);
+    else void markDbRead(id);
+  }
+
+  function handleMarkAll() {
+    markAllRead();
+    void markAllDbRead();
+  }
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -42,13 +64,15 @@ export function NotificationBell() {
       <SheetContent side="right" className="flex w-full flex-col sm:max-w-sm">
         <SheetHeader>
           <SheetTitle>Notifications</SheetTitle>
-          <SheetDescription>Alertes des offres en vedette près de vous.</SheetDescription>
+          <SheetDescription>
+            Alertes des offres en vedette près de vous et des commerces mis en favori.
+          </SheetDescription>
         </SheetHeader>
 
-        {notifications.length > 0 ? (
+        {merged.length > 0 ? (
           <button
             type="button"
-            onClick={() => markAllRead()}
+            onClick={handleMarkAll}
             className="self-start text-xs font-semibold text-navy hover:underline"
           >
             Tout marquer comme lu
@@ -56,16 +80,16 @@ export function NotificationBell() {
         ) : null}
 
         <div className="-mx-6 mt-2 flex-1 divide-y divide-border overflow-y-auto px-6">
-          {notifications.length === 0 ? (
+          {merged.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
               Aucune notification pour le moment.
             </p>
           ) : (
-            notifications.map((n) => (
+            merged.map((n) => (
               <button
-                key={n.id}
+                key={`${n.source}-${n.id}`}
                 type="button"
-                onClick={() => markRead(n.id)}
+                onClick={() => handleClick(n.id, n.source)}
                 className="flex w-full items-start gap-2 py-3 text-left"
               >
                 <span

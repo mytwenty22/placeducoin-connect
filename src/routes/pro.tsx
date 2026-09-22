@@ -1520,23 +1520,19 @@ function PromoScreen({
       const valide_jusqu_a = isEvent
         ? new Date(eventDateTime).toISOString()
         : new Date(Date.now() + Number(duration) * 3600 * 1000).toISOString();
-      const { data, error } = await supabase
-        .from("promos")
-        .insert({
-          commerce_id: commerceId,
-          titre,
-          kind,
-          description: isEvent ? description || null : null,
-          photo_url: !isEvent && photoUrl ? photoUrl : null,
-          prix_avant: !isEvent && prixAvant ? Number(prixAvant) : null,
-          prix_maintenant: !isEvent && prixMaintenant ? Number(prixMaintenant) : null,
-          valide_jusqu_a,
-        })
-        .select("id")
-        .single();
+      const { error } = await supabase.from("promos").insert({
+        commerce_id: commerceId,
+        titre,
+        kind,
+        description: isEvent ? description || null : null,
+        photo_url: photoUrl || null,
+        prix_avant: !isEvent && prixAvant ? Number(prixAvant) : null,
+        prix_maintenant: !isEvent && prixMaintenant ? Number(prixMaintenant) : null,
+        valide_jusqu_a,
+      });
       if (error) throw new Error(error.message);
-      // Best-effort : les alertes e-mail ne doivent jamais empêcher la publication de la promo.
-      void supabase.functions.invoke("send-promo-alerts", { body: { promoId: data.id } });
+      // Les alertes e-mail/notifications sont envoyées côté serveur par un trigger Postgres
+      // (promo_alert_trigger), pas depuis le client -- voir supabase/functions/send-promo-alerts.
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["promos", commerceId] });
@@ -1666,41 +1662,43 @@ function PromoScreen({
               />
             </label>
           </>
-        ) : (
-          <>
-            <div className="block">
-              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Photo de l'offre
-              </span>
-              {photoUrl ? (
-                <img
-                  src={photoUrl}
-                  alt=""
-                  className="mt-2 h-32 w-full rounded-xl bg-slate-50 object-contain"
-                />
-              ) : null}
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-input bg-card px-3 py-2 text-xs font-semibold text-foreground hover:bg-secondary">
-                  <ImageIcon className="h-4 w-4" />
-                  {uploadingPhoto ? "Envoi…" : "Téléverser"}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    disabled={uploadingPhoto}
-                    onChange={handlePhotoFileChange}
-                  />
-                </label>
-                <span className="text-xs text-muted-foreground">ou</span>
-                <input
-                  value={photoUrl}
-                  onChange={(e) => setPhotoUrl(e.target.value)}
-                  placeholder="https://…"
-                  className="min-w-0 flex-1 rounded-xl border border-input bg-card px-3 py-2 text-xs text-foreground outline-none focus:border-navy"
-                />
-              </div>
-            </div>
+        ) : null}
 
+        <div className="block">
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {isEvent ? "Photo de l'événement" : "Photo de l'offre"}
+          </span>
+          {photoUrl ? (
+            <img
+              src={photoUrl}
+              alt=""
+              className="mt-2 h-32 w-full rounded-xl bg-slate-50 object-contain"
+            />
+          ) : null}
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-input bg-card px-3 py-2 text-xs font-semibold text-foreground hover:bg-secondary">
+              <ImageIcon className="h-4 w-4" />
+              {uploadingPhoto ? "Envoi…" : "Téléverser"}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={uploadingPhoto}
+                onChange={handlePhotoFileChange}
+              />
+            </label>
+            <span className="text-xs text-muted-foreground">ou</span>
+            <input
+              value={photoUrl}
+              onChange={(e) => setPhotoUrl(e.target.value)}
+              placeholder="https://…"
+              className="min-w-0 flex-1 rounded-xl border border-input bg-card px-3 py-2 text-xs text-foreground outline-none focus:border-navy"
+            />
+          </div>
+        </div>
+
+        {!isEvent ? (
+          <>
             <div className="grid grid-cols-3 gap-3">
               <Field
                 label="Prix avant (€)"
@@ -1737,7 +1735,7 @@ function PromoScreen({
                 : "Astuce : passez par l'onglet Visibilité pour placer cette offre tout en haut de la marketplace."}
             </p>
           </>
-        )}
+        ) : null}
 
         <div className="block">
           <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -1774,7 +1772,7 @@ function PromoScreen({
                     ...(isEvent && eventDateTime
                       ? { eventDate: new Date(eventDateTime).toISOString() }
                       : {}),
-                    ...(!isEvent && photoUrl ? { photoUrl } : {}),
+                    ...(photoUrl ? { photoUrl } : {}),
                   },
                 ],
               }}

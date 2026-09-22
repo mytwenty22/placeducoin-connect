@@ -3,7 +3,6 @@ import { corsHeaders } from "../_shared/cors.ts";
 import { sendAlertEmail } from "../_shared/resend.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
-const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const SITE_URL = Deno.env.get("SITE_URL") ?? "https://placeducoin-connect.vercel.app";
 
@@ -18,28 +17,27 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    // Appelée uniquement par le trigger Postgres mairie_alert_trigger (voir migration
+    // 20260922140000_reliable_alert_triggers.sql), authentifié avec la clé service_role stockée
+    // dans Vault -- jamais directement par le client.
     const authHeader = req.headers.get("Authorization") ?? "";
-    const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const {
-      data: { user },
-    } = await userClient.auth.getUser();
-    if (!user) return jsonError("Non authentifié.", 401);
+    if (authHeader !== `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`)
+      return jsonError("Non autorisé.", 401);
 
     const { infoId } = await req.json();
+    console.log("send-mairie-alerts: reçu infoId =", infoId);
     if (!infoId) return jsonError("infoId manquant.", 400);
 
     const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     const { data: info, error: infoError } = await adminClient
       .from("Infos_Mairie")
-      .select("id, titre, corps, type, ville_id, created_by")
+      .select("id, titre, corps, type, ville_id")
       .eq("id", infoId)
       .maybeSingle();
     if (infoError) throw infoError;
     if (!info) return jsonError("Publication introuvable.", 404);
-    if (info.created_by !== user.id) return jsonError("Non autorisé.", 403);
+    console.log("send-mairie-alerts: info =", info.titre, "ville_id =", info.ville_id);
 
     const { data: subscribers, error: subsError } = await adminClient
       .from("alert_subscriptions")
@@ -47,6 +45,11 @@ Deno.serve(async (req) => {
       .eq("ville_id", info.ville_id)
       .contains("categories", ["locale"]);
     if (subsError) throw subsError;
+    console.log(
+      "send-mairie-alerts: abonnés trouvés =",
+      subscribers?.length ?? 0,
+      subscribers?.map((s) => s.email),
+    );
 
     const subject = `Mairie — ${info.titre}`;
     const html = `
@@ -56,12 +59,13 @@ Deno.serve(async (req) => {
       <p><a href="${SITE_URL}/mairie">Voir sur PlaceDuCoin</a></p>
     `;
 
-    const results = await Promise.allSettled(
+    const results = await Promise.all(
       (subscribers ?? []).filter((s) => s.email).map((s) => sendAlertEmail(s.email, subject, html)),
     );
-    const sent = results.filter((r) => r.status === "fulfilled").length;
+    const sent = results.filter((r) => r.ok).length;
+    console.log("send-mairie-alerts: résultats =", JSON.stringify(results));
 
-    return new Response(JSON.stringify({ sent }), {
+    return new Response(JSON.stringify({ sent, results }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
