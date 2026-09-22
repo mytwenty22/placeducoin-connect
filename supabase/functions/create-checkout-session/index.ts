@@ -123,7 +123,8 @@ Deno.serve(async (req) => {
       const position = body.position as "top" | "bottom";
       const tier = body.tier as BannerTierKey;
       const monthKey = body.monthKey as string;
-      const imageUrl = (body.imageUrl as string | undefined)?.trim() || commerce.logo_url || commerce.photo_url;
+      const imageUrl =
+        (body.imageUrl as string | undefined)?.trim() || commerce.logo_url || commerce.photo_url;
       if (!["top", "bottom"].includes(position) || !BANNER_TIER_PRICES[tier]) {
         return new Response(JSON.stringify({ error: "Paramètres de bannière invalides." }), {
           status: 400,

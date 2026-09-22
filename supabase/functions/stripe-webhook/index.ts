@@ -46,7 +46,11 @@ async function activateFromSession(session: Stripe.Checkout.Session) {
     // actif existant sur cette position est remplacé, une formule mensuelle remplace uniquement
     // la réservation qui démarre exactement à la même date (un achat à l'avance sur un autre mois
     // doit rester intact).
-    const dedup = admin.from("banners").delete().eq("commerce_id", commerceId).eq("position", position);
+    const dedup = admin
+      .from("banners")
+      .delete()
+      .eq("commerce_id", commerceId)
+      .eq("position", position);
     if (tier === "test") {
       await dedup.eq("tier", "test").eq("active", true);
     } else {
