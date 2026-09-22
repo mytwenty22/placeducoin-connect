@@ -144,15 +144,21 @@ function MairieDashboard({ userId }: { userId: string }) {
       date_info: string;
       type: NoticeType;
     }) => {
-      const { error } = await supabase.from("Infos_Mairie").insert({
-        ville_id: villeId,
-        created_by: userId,
-        titre: notice.titre,
-        corps: notice.corps,
-        date_info: notice.date_info || "Aujourd'hui",
-        type: notice.type,
-      });
+      const { data, error } = await supabase
+        .from("Infos_Mairie")
+        .insert({
+          ville_id: villeId,
+          created_by: userId,
+          titre: notice.titre,
+          corps: notice.corps,
+          date_info: notice.date_info || "Aujourd'hui",
+          type: notice.type,
+        })
+        .select("id")
+        .single();
       if (error) throw error;
+      // Best-effort : les alertes e-mail ne doivent jamais empêcher la publication.
+      void supabase.functions.invoke("send-mairie-alerts", { body: { infoId: data.id } });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["infos-mairie", villeId] });

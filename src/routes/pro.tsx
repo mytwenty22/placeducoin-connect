@@ -1520,17 +1520,23 @@ function PromoScreen({
       const valide_jusqu_a = isEvent
         ? new Date(eventDateTime).toISOString()
         : new Date(Date.now() + Number(duration) * 3600 * 1000).toISOString();
-      const { error } = await supabase.from("promos").insert({
-        commerce_id: commerceId,
-        titre,
-        kind,
-        description: isEvent ? description || null : null,
-        photo_url: !isEvent && photoUrl ? photoUrl : null,
-        prix_avant: !isEvent && prixAvant ? Number(prixAvant) : null,
-        prix_maintenant: !isEvent && prixMaintenant ? Number(prixMaintenant) : null,
-        valide_jusqu_a,
-      });
+      const { data, error } = await supabase
+        .from("promos")
+        .insert({
+          commerce_id: commerceId,
+          titre,
+          kind,
+          description: isEvent ? description || null : null,
+          photo_url: !isEvent && photoUrl ? photoUrl : null,
+          prix_avant: !isEvent && prixAvant ? Number(prixAvant) : null,
+          prix_maintenant: !isEvent && prixMaintenant ? Number(prixMaintenant) : null,
+          valide_jusqu_a,
+        })
+        .select("id")
+        .single();
       if (error) throw new Error(error.message);
+      // Best-effort : les alertes e-mail ne doivent jamais empêcher la publication de la promo.
+      void supabase.functions.invoke("send-promo-alerts", { body: { promoId: data.id } });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["promos", commerceId] });
