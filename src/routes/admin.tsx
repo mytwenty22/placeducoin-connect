@@ -13,7 +13,10 @@ import { getSiteUrl } from "@/lib/site-url";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
-    meta: [{ title: "Administration — PlaceDuCoin" }, { name: "robots", content: "noindex" }],
+    meta: [
+      { title: "Administration — Bons Plans du Coin" },
+      { name: "robots", content: "noindex" },
+    ],
   }),
   component: AdminSpace,
 });

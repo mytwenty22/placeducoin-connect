@@ -26,16 +26,16 @@ import type { ThemeVisuel } from "@/lib/site-theme";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "PlaceDuCoin — La marketplace des commerces de votre quartier" },
+      { title: "Bons Plans du Coin — Toute la vie de votre quartier en un clic" },
       {
         name: "description",
         content:
-          "Promos flash, arrivages et infos mairie des commerçants près de chez vous : boucher, coiffeur, fleuriste et plus.",
+          "Les promotions de vos commerçants, les événements de votre quartier et les informations officielles de votre mairie, réunis en un clic.",
       },
-      { property: "og:title", content: "PlaceDuCoin — Marketplace de quartier" },
+      { property: "og:title", content: "Bons Plans du Coin — Marketplace de quartier" },
       {
         property: "og:description",
-        content: "Découvrez les offres du moment des commerces de votre ville, en direct.",
+        content: "Toute la vie de votre quartier, vos commerces et votre mairie en un clic.",
       },
     ],
   }),
@@ -333,7 +333,7 @@ function Marketplace() {
               : "Les bons plans de vos commerçants, en direct"}
           </h1>
           <p className="mt-1 text-sm text-primary-foreground/70">
-            Promos flash, arrivages du jour et informations officielles de la commune.
+            Toute la vie de votre quartier, vos commerces et votre mairie en un clic.
           </p>
 
           <div className="mt-3 sm:hidden">
@@ -576,7 +576,7 @@ function Marketplace() {
       <BottomSponsorBanner banner={bottomBannerQuery.data} />
 
       <footer className="bg-gradient-navy py-8 text-center text-sm text-primary-foreground/70">
-        <p>PlaceDuCoin — le commerce local, à portée de rue.</p>
+        <p>Bons Plans du Coin — le commerce local, à portée de rue.</p>
         <Link to="/cgv" className="mt-2 inline-block underline hover:text-primary-foreground">
           Conditions Générales de Vente & Mentions Légales
         </Link>

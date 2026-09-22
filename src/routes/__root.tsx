@@ -83,14 +83,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         content:
           "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover",
       },
-      { title: "PlaceDuCoin — Marketplace des commerces de quartier" },
+      { title: "Bons Plans du Coin — Toute la vie de votre quartier en un clic" },
       {
         name: "description",
-        content: "La marketplace locale des commerçants, promos flash et infos mairie.",
+        content:
+          "Bons Plans du Coin : les promotions de vos commerçants, les événements de votre quartier et les informations officielles de votre mairie, réunis en un clic.",
       },
-      { name: "author", content: "PlaceDuCoin" },
-      { property: "og:title", content: "PlaceDuCoin" },
-      { property: "og:description", content: "La marketplace locale des commerçants." },
+      { name: "author", content: "Bons Plans du Coin" },
+      { property: "og:title", content: "Bons Plans du Coin" },
+      {
+        property: "og:description",
+        content: "Toute la vie de votre quartier, vos commerces et votre mairie en un clic.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@Lovable" },

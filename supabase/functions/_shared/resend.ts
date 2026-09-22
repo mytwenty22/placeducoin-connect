@@ -1,6 +1,8 @@
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
 const ALERTS_FROM_EMAIL =
-  Deno.env.get("ALERTS_FROM_EMAIL") ?? "PlaceDuCoin <onboarding@resend.dev>";
+  // TODO: repasser à "Bons Plans du Coin <notifications@bonplanducoin.fr>" une fois ce domaine
+  // vérifié dans Resend (Resend rejette tout envoi "from" un domaine non vérifié).
+  Deno.env.get("ALERTS_FROM_EMAIL") ?? "Bons Plans du Coin <onboarding@resend.dev>";
 
 export type SendResult = { to: string; ok: boolean; status?: number; error?: string };
 

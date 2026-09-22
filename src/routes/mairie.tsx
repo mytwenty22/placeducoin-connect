@@ -11,13 +11,13 @@ import { supabase } from "@/lib/supabase";
 export const Route = createFileRoute("/mairie")({
   head: () => ({
     meta: [
-      { title: "Espace Compagnon Mairie — PlaceDuCoin" },
+      { title: "Espace Compagnon Mairie — Bons Plans du Coin" },
       {
         name: "description",
         content:
           "Accès gratuit pour les agents municipaux : publiez alertes, travaux et événements sur la page de votre commune.",
       },
-      { property: "og:title", content: "Espace Compagnon Mairie — PlaceDuCoin" },
+      { property: "og:title", content: "Espace Compagnon Mairie — Bons Plans du Coin" },
       {
         property: "og:description",
         content: "Publiez gratuitement les informations officielles de votre commune.",
