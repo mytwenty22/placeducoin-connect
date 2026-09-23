@@ -49,13 +49,13 @@ type AccountType = "pro" | "association";
 export const Route = createFileRoute("/pro")({
   head: () => ({
     meta: [
-      { title: "Espace Pro Commerçant — Bons Plans du Coin" },
+      { title: "Espace Pro Commerçant — SpotLocal" },
       {
         name: "description",
         content:
           "Gérez votre fiche, publiez une promo flash en 30 secondes et boostez votre visibilité locale.",
       },
-      { property: "og:title", content: "Espace Pro Commerçant — Bons Plans du Coin" },
+      { property: "og:title", content: "Espace Pro Commerçant — SpotLocal" },
       {
         property: "og:description",
         content: "Profil, promos flash et options de visibilité pour les commerçants.",

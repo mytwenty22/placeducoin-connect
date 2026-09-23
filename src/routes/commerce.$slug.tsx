@@ -78,7 +78,7 @@ export const Route = createFileRoute("/commerce/$slug")({
     if (!loaderData) {
       return {
         meta: [
-          { title: "Commerce introuvable — Bons Plans du Coin" },
+          { title: "Commerce introuvable — SpotLocal" },
           { name: "robots", content: "noindex" },
         ],
       };
@@ -255,7 +255,7 @@ function ShopSite() {
             )}
             {offer.premium ? (
               <p className="mt-4 inline-flex items-center gap-1 rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-navy">
-                <Flame className="h-3.5 w-3.5 text-promo" /> Site sur-mesure Bons Plans du Coin
+                <Flame className="h-3.5 w-3.5 text-promo" /> Site sur-mesure SpotLocal
               </p>
             ) : null}
           </section>

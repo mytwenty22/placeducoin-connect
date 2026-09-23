@@ -109,7 +109,7 @@ export const Route = createFileRoute("/site/$slug")({
   },
   head: ({ loaderData }) => {
     if (!loaderData) {
-      return { meta: [{ title: "Site introuvable — Bons Plans du Coin" }] };
+      return { meta: [{ title: "Site introuvable — SpotLocal" }] };
     }
     const { commerce } = loaderData;
     return {
@@ -567,7 +567,7 @@ function StandaloneSite() {
         <p>
           Propulsé par{" "}
           <Link to="/" className="font-semibold hover:underline">
-            Bons Plans du Coin
+            SpotLocal
           </Link>
         </p>
         <Link to="/cgv" className="mt-1 inline-block underline hover:no-underline">

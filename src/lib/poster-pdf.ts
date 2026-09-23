@@ -9,7 +9,7 @@ export type PosterCommerce = {
 };
 
 // Adresse encodée dans le QR code : la fiche publique du commerce (son site sur-mesure s'il en a
-// un), avec `?app=1` pour que la page propose aussitôt d'installer l'application Bons Plans du Coin.
+// un), avec `?app=1` pour que la page propose aussitôt d'installer l'application SpotLocal.
 // Toujours sur l'URL de production (getSiteUrl), jamais sur l'origine courante : une affiche
 // imprimée depuis localhost enverrait tous les clients vers un lien mort.
 export function posterTargetUrl(commerce: Pick<PosterCommerce, "slug" | "site_actif">) {
@@ -103,7 +103,7 @@ export async function downloadPosterPdf(commerce: PosterCommerce) {
   doc.setTextColor("#FFFFFF");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
-  doc.text("Bons Plans du Coin", center, 16, { align: "center", charSpace: 0.6 });
+  doc.text("SpotLocal", center, 16, { align: "center", charSpace: 0.6 });
 
   const logoBox = 44;
   const logoX = center - logoBox / 2;
@@ -152,7 +152,7 @@ export async function downloadPosterPdf(commerce: PosterCommerce) {
   doc.setFontSize(24);
   doc.text("Nos offres du moment", center, 138, { align: "center" });
   doc.setFontSize(19);
-  doc.text("sont sur l'appli Bons Plans du Coin !", center, 148, { align: "center" });
+  doc.text("sont sur l'appli SpotLocal !", center, 148, { align: "center" });
 
   doc.setTextColor(GREY);
   doc.setFont("helvetica", "normal");

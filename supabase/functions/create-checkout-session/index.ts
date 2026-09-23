@@ -95,7 +95,7 @@ Deno.serve(async (req) => {
       lineItem = {
         price_data: {
           currency: "eur",
-          product_data: { name: "Bons Plans du Coin — Site Pro" },
+          product_data: { name: "SpotLocal — Site Pro" },
           unit_amount: 1900,
           recurring: { interval: "month" },
         },

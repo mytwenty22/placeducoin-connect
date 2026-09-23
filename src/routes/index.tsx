@@ -26,13 +26,13 @@ import type { ThemeVisuel } from "@/lib/site-theme";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Bons Plans du Coin — Toute la vie de votre quartier en un clic" },
+      { title: "SpotLocal — Toute la vie de votre quartier en un clic" },
       {
         name: "description",
         content:
           "Les promotions de vos commerçants, les événements de votre quartier et les informations officielles de votre mairie, réunis en un clic.",
       },
-      { property: "og:title", content: "Bons Plans du Coin — Marketplace de quartier" },
+      { property: "og:title", content: "SpotLocal — Marketplace de quartier" },
       {
         property: "og:description",
         content: "Toute la vie de votre quartier, vos commerces et votre mairie en un clic.",
@@ -576,7 +576,7 @@ function Marketplace() {
       <BottomSponsorBanner banner={bottomBannerQuery.data} />
 
       <footer className="bg-gradient-navy py-8 text-center text-sm text-primary-foreground/70">
-        <p>Bons Plans du Coin — le commerce local, à portée de rue.</p>
+        <p>SpotLocal — le commerce local, à portée de rue.</p>
         <Link to="/cgv" className="mt-2 inline-block underline hover:text-primary-foreground">
           Conditions Générales de Vente & Mentions Légales
         </Link>

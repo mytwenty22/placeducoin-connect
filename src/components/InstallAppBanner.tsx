@@ -19,10 +19,10 @@ function isIos() {
 }
 
 /**
- * Bandeau d'invitation à installer l'application Bons Plans du Coin (PWA). Il n'apparaît que pour
+ * Bandeau d'invitation à installer l'application SpotLocal (PWA). Il n'apparaît que pour
  * les visiteurs arrivés via le QR code de l'affiche vitrine (`?app=1` dans l'URL) et qui n'ont pas
  * déjà installé l'application : un client qui scanne l'affiche voit la fiche du commerce ET la
- * proposition de garder Bons Plans du Coin sur son écran d'accueil.
+ * proposition de garder SpotLocal sur son écran d'accueil.
  */
 export function InstallAppBanner() {
   const [visible, setVisible] = useState(false);
@@ -63,15 +63,15 @@ export function InstallAppBanner() {
   return (
     <div
       role="region"
-      aria-label="Installer l'application Bons Plans du Coin"
+      aria-label="Installer l'application SpotLocal"
       className="fixed inset-x-3 bottom-3 z-50 mx-auto flex max-w-md items-center gap-3 rounded-2xl bg-navy p-3 pr-2 text-primary-foreground shadow-lift"
       style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 0.75rem)" }}
     >
       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-promo font-display text-lg font-black text-promo-foreground">
-        B
+        S
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-bold">Installez Bons Plans du Coin</p>
+        <p className="text-sm font-bold">Installez SpotLocal</p>
         {installEvent ? (
           <p className="text-xs text-primary-foreground/70">
             Retrouvez les promos de vos commerçants en un geste.

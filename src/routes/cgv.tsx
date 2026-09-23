@@ -5,11 +5,11 @@ import { AppHeader } from "@/components/AppHeader";
 export const Route = createFileRoute("/cgv")({
   head: () => ({
     meta: [
-      { title: "Conditions Générales de Vente & Mentions Légales — Bons Plans du Coin" },
+      { title: "Conditions Générales de Vente & Mentions Légales — SpotLocal" },
       {
         name: "description",
         content:
-          "Conditions générales de vente et mentions légales de Bons Plans du Coin : abonnement Site Pro, option Vedette, réservation de bannières publicitaires.",
+          "Conditions générales de vente et mentions légales de SpotLocal : abonnement Site Pro, option Vedette, réservation de bannières publicitaires.",
       },
     ],
   }),
@@ -36,7 +36,7 @@ function CgvPage() {
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Applicables à toute souscription d'un abonnement Site Pro, d'une option Vedette ou d'une
-            réservation de bannière publicitaire sur la plateforme Bons Plans du Coin.
+            réservation de bannière publicitaire sur la plateforme SpotLocal.
           </p>
         </div>
 
@@ -51,7 +51,7 @@ function CgvPage() {
 
         <Section title="1. Éditeur de la plateforme — Mentions légales">
           <p>
-            La plateforme Bons Plans du Coin est éditée par :{" "}
+            La plateforme SpotLocal est éditée par :{" "}
             <strong className="text-foreground">[Nom et prénom du micro-entrepreneur]</strong>,
             exerçant sous le statut de micro-entreprise (entreprise individuelle), immatriculée sous
             le numéro SIRET <strong className="text-foreground">[Numéro SIRET]</strong>, dont le
@@ -78,9 +78,9 @@ function CgvPage() {
 
         <Section title="2. Objet">
           <p>
-            Bons Plans du Coin est une marketplace mettant en relation les commerces d'une commune
-            avec leurs habitants. Elle propose aux commerçants et associations professionnels (B2B),
-            à titre payant, les prestations suivantes :
+            SpotLocal est une marketplace mettant en relation les commerces d'une commune avec leurs
+            habitants. Elle propose aux commerçants et associations professionnels (B2B), à titre
+            payant, les prestations suivantes :
           </p>
           <ul className="list-disc space-y-1 pl-5">
             <li>
@@ -129,7 +129,7 @@ function CgvPage() {
           <p>
             En conséquence, le droit de rétractation prévu par les articles L221-18 et suivants du
             Code de la consommation, réservé aux consommateurs, ne s'applique pas aux commandes
-            passées sur Bons Plans du Coin.
+            passées sur SpotLocal.
           </p>
           <p>
             Toute commande validée et payée est ferme et définitive. Aucun remboursement, total ou
@@ -142,9 +142,9 @@ function CgvPage() {
 
         <Section title="5. Modération des visuels">
           <p>
-            Bons Plans du Coin se réserve le droit de refuser la publication, ou de suspendre et
-            retirer sans préavis tout visuel (bannière, logo, photo de couverture, image de
-            promotion ou de produit) déjà publié dès lors qu'il :
+            SpotLocal se réserve le droit de refuser la publication, ou de suspendre et retirer sans
+            préavis tout visuel (bannière, logo, photo de couverture, image de promotion ou de
+            produit) déjà publié dès lors qu'il :
           </p>
           <ul className="list-disc space-y-1 pl-5">
             <li>
@@ -181,9 +181,9 @@ function CgvPage() {
 
         <Section title="7. Responsabilité">
           <p>
-            Bons Plans du Coin agit en qualité d'intermédiaire technique mettant à disposition un
-            emplacement d'affichage. Le commerçant demeure seul responsable du contenu de sa fiche,
-            de ses offres, de ses visuels et de la conformité de son activité à la réglementation
+            SpotLocal agit en qualité d'intermédiaire technique mettant à disposition un emplacement
+            d'affichage. Le commerçant demeure seul responsable du contenu de sa fiche, de ses
+            offres, de ses visuels et de la conformité de son activité à la réglementation
             applicable (droit de la consommation, affichage des prix, etc.).
           </p>
         </Section>
@@ -191,10 +191,10 @@ function CgvPage() {
         <Section title="8. Données personnelles">
           <p>
             Les données transmises lors de la création d'un compte ou d'une commande sont traitées
-            par Bons Plans du Coin pour la gestion de la relation commerciale. Elles sont hébergées
-            par Supabase Inc. Conformément au RGPD, chaque utilisateur dispose d'un droit d'accès,
-            de rectification et de suppression de ses données, exerçable auprès de l'adresse de
-            contact indiquée à l'article 1.
+            par SpotLocal pour la gestion de la relation commerciale. Elles sont hébergées par
+            Supabase Inc. Conformément au RGPD, chaque utilisateur dispose d'un droit d'accès, de
+            rectification et de suppression de ses données, exerçable auprès de l'adresse de contact
+            indiquée à l'article 1.
           </p>
         </Section>
 
@@ -207,9 +207,9 @@ function CgvPage() {
 
         <Section title="10. Modification des CGV">
           <p>
-            Bons Plans du Coin peut modifier les présentes CGV à tout moment. La version applicable
-            à une commande est celle en vigueur sur la plateforme au moment de la validation de
-            cette commande.
+            SpotLocal peut modifier les présentes CGV à tout moment. La version applicable à une
+            commande est celle en vigueur sur la plateforme au moment de la validation de cette
+            commande.
           </p>
         </Section>
 

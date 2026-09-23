@@ -83,14 +83,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         content:
           "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover",
       },
-      { title: "Bons Plans du Coin — Toute la vie de votre quartier en un clic" },
+      { title: "SpotLocal — Toute la vie de votre quartier en un clic" },
       {
         name: "description",
         content:
-          "Bons Plans du Coin : les promotions de vos commerçants, les événements de votre quartier et les informations officielles de votre mairie, réunis en un clic.",
+          "SpotLocal : les promotions de vos commerçants, les événements de votre quartier et les informations officielles de votre mairie, réunis en un clic.",
       },
-      { name: "author", content: "Bons Plans du Coin" },
-      { property: "og:title", content: "Bons Plans du Coin" },
+      { name: "author", content: "SpotLocal" },
+      { property: "og:title", content: "SpotLocal" },
       {
         property: "og:description",
         content: "Toute la vie de votre quartier, vos commerces et votre mairie en un clic.",

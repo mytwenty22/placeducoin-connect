@@ -7,10 +7,7 @@ import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/reset-password")({
   head: () => ({
-    meta: [
-      { title: "Nouveau mot de passe — Bons Plans du Coin" },
-      { name: "robots", content: "noindex" },
-    ],
+    meta: [{ title: "Nouveau mot de passe — SpotLocal" }, { name: "robots", content: "noindex" }],
   }),
   component: ResetPasswordPage,
 });

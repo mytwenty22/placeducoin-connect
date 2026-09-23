@@ -21,7 +21,7 @@ export const Route = createFileRoute("/compte")({
   },
   head: () => ({
     meta: [
-      { title: "Mon compte — Bons Plans du Coin" },
+      { title: "Mon compte — SpotLocal" },
       {
         name: "description",
         content: "Retrouvez vos commerces favoris et leurs offres du moment.",

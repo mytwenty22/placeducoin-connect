@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
     const subject = `Nouvelle offre chez ${commerce.nom}`;
     const html = `
       <p><strong>${commerce.nom}</strong> vient de publier une nouvelle offre : ${promo.titre}.</p>
-      <p><a href="${SITE_URL}/commerce/${commerce.slug}">Voir l'offre sur Bons Plans du Coin</a></p>
+      <p><a href="${SITE_URL}/commerce/${commerce.slug}">Voir l'offre sur SpotLocal</a></p>
     `;
 
     const results = await Promise.all(

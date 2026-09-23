@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
       <p><strong>${info.type}</strong></p>
       <p>${info.titre}</p>
       ${info.corps ? `<p>${info.corps}</p>` : ""}
-      <p><a href="${SITE_URL}/mairie">Voir sur Bons Plans du Coin</a></p>
+      <p><a href="${SITE_URL}/mairie">Voir sur SpotLocal</a></p>
     `;
 
     const results = await Promise.all(

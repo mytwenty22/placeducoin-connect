@@ -26,8 +26,8 @@ export default defineConfig({
         injectRegister: false,
         includeAssets: ["favicon.ico"],
         manifest: {
-          name: "Bons Plans du Coin",
-          short_name: "Bons Plans",
+          name: "SpotLocal",
+          short_name: "SpotLocal",
           description:
             "Les promotions de vos commerçants, les événements de votre quartier et les infos de votre mairie, en un clic.",
           lang: "fr",
