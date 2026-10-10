@@ -4,7 +4,7 @@ import { sendAlertEmail } from "../_shared/resend.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const SITE_URL = Deno.env.get("SITE_URL") ?? "https://placeducoin-connect.vercel.app";
+const SITE_URL = Deno.env.get("SITE_URL") ?? "https://spotlocal.fr";
 
 function jsonError(message: string, status: number) {
   return new Response(JSON.stringify({ error: message }), {

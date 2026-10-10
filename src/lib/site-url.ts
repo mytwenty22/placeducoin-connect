@@ -3,10 +3,10 @@
 // localhost sends commerçants a link to their own machine instead of the live site. The
 // fallback is the prod domain itself (not window.location.origin), so a missing env var
 // fails safe to a working link instead of silently reintroducing the localhost bug.
-const PROD_SITE_URL = "https://placeducoin-connect.vercel.app";
+const PROD_SITE_URL = "https://spotlocal.fr";
 
 // VITE_SITE_URL has repeatedly been set on Vercel as a pasted Markdown link
-// (e.g. "[https://placeducoin-connect.vercel.app](https://placeducoin-connect.vercel.app)")
+// (e.g. "[https://spotlocal.fr](https://spotlocal.fr)")
 // instead of a bare URL. Unwrap that shape and strip any stray brackets/parens
 // so a misconfigured env var can never leak Markdown syntax into an email link.
 function sanitizeSiteUrl(raw: string): string {

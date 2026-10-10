@@ -11,7 +11,7 @@ const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 // Même domaine de secours que src/lib/site-url.ts côté client -- garantit une redirection valide
 // même si la variable d'env SITE_URL n'est pas configurée sur ce projet Supabase.
-const SITE_URL = Deno.env.get("SITE_URL") ?? "https://placeducoin-connect.vercel.app";
+const SITE_URL = Deno.env.get("SITE_URL") ?? "https://spotlocal.fr";
 
 type BannerTierKey = "test" | "standard" | "exclusif";
 
