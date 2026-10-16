@@ -1,7 +1,16 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { CheckCircle2, ChevronDown, ChevronUp, Eye, PlayCircle, Store, Zap } from "lucide-react";
+import {
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Eye,
+  MapPin,
+  PlayCircle,
+  Store,
+  Zap,
+} from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { PRO_TUTORIAL_VIDEO_URL, toVideoEmbedUrl } from "@/lib/video-embed";
 
@@ -11,6 +20,8 @@ type GuideCommerce = {
   photo_url: string | null;
   logo_url: string | null;
   description: string | null;
+  latitude: number | null;
+  longitude: number | null;
   site_actif: boolean;
 };
 
@@ -44,7 +55,22 @@ export function ProQuickGuide({
     },
   });
 
-  const profileDone = Boolean((commerce.photo_url || commerce.logo_url) && commerce.description);
+  // Sans position GPS, la fiche n'apparaît pas sur la carte de l'accueil et les clients ne peuvent
+  // pas valider leurs coupons sur place : l'étape 1 n'est cochée qu'une fois la position posée.
+  const hasLocation = commerce.latitude != null && commerce.longitude != null;
+  const profileDone = Boolean(
+    (commerce.photo_url || commerce.logo_url) && commerce.description && hasLocation,
+  );
+
+  function goToLocation() {
+    onNavigate("profil");
+    // Laisse l'écran Mon Profil se monter avant de faire défiler jusqu'au champ.
+    window.setTimeout(() => {
+      document
+        .getElementById("shop-location")
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 100);
+  }
   const publishDone = (promoCountQuery.data ?? 0) > 0;
   const allDone = profileDone && publishDone;
 
@@ -105,6 +131,25 @@ export function ProQuickGuide({
         )}
       </button>
 
+      {/* Rappel affiché même carte repliée : c'est l'oubli le plus pénalisant. */}
+      {!hasLocation ? (
+        <div className="mx-4 mb-4 flex flex-col gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-amber-950 sm:flex-row sm:items-center">
+          <MapPin className="hidden h-5 w-5 shrink-0 text-amber-600 sm:block" />
+          <p className="min-w-0 flex-1 text-xs leading-snug">
+            <strong>Position GPS non renseignée.</strong> Votre{" "}
+            {isAssociation ? "association" : "boutique"} n'apparaît pas sur la carte de l'accueil et
+            vos clients ne peuvent pas valider leurs coupons sur place.
+          </p>
+          <button
+            type="button"
+            onClick={goToLocation}
+            className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700"
+          >
+            <MapPin className="h-3.5 w-3.5" /> Renseigner ma position
+          </button>
+        </div>
+      ) : null}
+
       {!isCollapsed ? (
         <div className="grid gap-4 border-t border-border p-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           <div className="aspect-video overflow-hidden rounded-xl bg-gradient-navy">
@@ -133,10 +178,19 @@ export function ProQuickGuide({
               n={1}
               done={profileDone}
               title="Complétez votre fiche"
-              text="Photo ou logo, description, horaires et position de la boutique."
+              text={
+                hasLocation
+                  ? "Photo ou logo, description, horaires et position de la boutique."
+                  : "Photo ou logo, description, horaires — et surtout la position GPS de la boutique."
+              }
               action={
-                <StepButton onClick={() => onNavigate("profil")}>
-                  <Store className="h-3.5 w-3.5" /> Mon Profil
+                <StepButton onClick={hasLocation ? () => onNavigate("profil") : goToLocation}>
+                  {hasLocation ? (
+                    <Store className="h-3.5 w-3.5" />
+                  ) : (
+                    <MapPin className="h-3.5 w-3.5" />
+                  )}{" "}
+                  {hasLocation ? "Mon Profil" : "Ma position GPS"}
                 </StepButton>
               }
             />

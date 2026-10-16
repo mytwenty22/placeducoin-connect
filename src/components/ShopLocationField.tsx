@@ -92,7 +92,8 @@ export function ShopLocationField({
   }
 
   return (
-    <div className="block">
+    // id : cible du rappel "Renseigner ma position" du guide rapide (ProQuickGuide).
+    <div id="shop-location" className="block scroll-mt-24">
       <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         Position GPS de la boutique
       </span>
