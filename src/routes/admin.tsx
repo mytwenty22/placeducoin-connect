@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { Session } from "@supabase/supabase-js";
 import { KeyRound, LogOut, ShieldCheck, UserPlus } from "lucide-react";
+import { AdminFiches } from "@/components/AdminFiches";
 import { AdminQuartiers } from "@/components/AdminQuartiers";
 import { AppHeader } from "@/components/AppHeader";
 import { EmailPasswordLogin } from "@/components/EmailPasswordLogin";
@@ -178,7 +179,7 @@ function AdminDashboard({ userId }: { userId: string }) {
         </span>
         <div className="min-w-0 flex-1">
           <h1 className="truncate font-display text-2xl font-extrabold">Administration</h1>
-          <p className="text-sm text-primary-foreground/70">Comptes et quartiers</p>
+          <p className="text-sm text-primary-foreground/70">Fiches, comptes et quartiers</p>
         </div>
         <button
           type="button"
@@ -188,6 +189,8 @@ function AdminDashboard({ userId }: { userId: string }) {
           <LogOut className="h-3.5 w-3.5" /> Déconnexion
         </button>
       </header>
+
+      <AdminFiches />
 
       <CreateMairieAccountForm
         pending={createMutation.isPending}

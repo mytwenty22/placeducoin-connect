@@ -84,6 +84,9 @@ type Profile = { role: "mairie" | "pro" | "association" | "admin" } & EntityIden
 type Ville = { id: string; nom: string; slug?: string };
 type Commerce = {
   id: string;
+  /** Fiche suspendue par un admin : masquée du site public, publication d'offres bloquée. */
+  suspended_at?: string | null;
+  suspension_reason?: string | null;
   slug: string;
   nom: string;
   trade: string;
@@ -438,7 +441,7 @@ function ProDashboard({ userId }: { userId: string }) {
       const { data, error } = await supabase
         .from("commerces")
         .select(
-          "id, slug, nom, trade, category, ville_id, quartier_id, adresse, code_postal, latitude, longitude, telephone, photo_url, logo_url, description, horaires, instagram, galerie_urls, video_url, theme_visuel, site_actif, boost_actif, boost_expires_at",
+          "id, slug, nom, trade, category, ville_id, quartier_id, adresse, code_postal, latitude, longitude, telephone, photo_url, logo_url, description, horaires, instagram, galerie_urls, video_url, theme_visuel, site_actif, boost_actif, boost_expires_at, suspended_at, suspension_reason",
         )
         .eq("owner_id", userId)
         .maybeSingle();
@@ -590,6 +593,20 @@ function ProDashboard({ userId }: { userId: string }) {
           <p className="mt-1 text-sm text-muted-foreground">{commerce.nom}</p>
         </div>
       </div>
+
+      {commerce.suspended_at ? (
+        <div
+          role="alert"
+          className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800"
+        >
+          <p className="font-bold">Fiche suspendue par l'équipe SpotLocal</p>
+          <p className="mt-0.5 text-xs">
+            Elle n'apparaît plus sur le site et la publication d'offres est désactivée
+            {commerce.suspension_reason ? ` (motif : ${commerce.suspension_reason})` : ""}.
+            Contactez-nous à bonjour@spotlocal.fr pour la réactiver.
+          </p>
+        </div>
+      ) : null}
 
       <div className="mt-3 flex flex-wrap gap-2">
         <StatusPill
