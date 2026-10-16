@@ -6,6 +6,7 @@ import { GoogleRatingStars } from "@/components/GoogleRatingStars";
 import { CouponButton } from "@/components/CouponButton";
 import { ActivateOfferButton } from "@/components/ActivateOfferButton";
 import { FavoriteButton } from "@/components/FavoriteButton";
+import { FeaturedEventBlock } from "@/components/FeaturedEventBlock";
 import { InstallAppBanner } from "@/components/InstallAppBanner";
 import { supabase } from "@/lib/supabase";
 import { computeOpenStatus, type Horaire } from "@/lib/horaires";
@@ -47,6 +48,7 @@ type SitePromo = {
 type SiteEvent = {
   titre: string;
   description: string | null;
+  photo_url: string | null;
   valide_jusqu_a: string;
 } | null;
 
@@ -86,7 +88,7 @@ export const Route = createFileRoute("/site/$slug")({
 
     const { data: event } = await supabase
       .from("promos")
-      .select("titre, description, valide_jusqu_a")
+      .select("titre, description, photo_url, valide_jusqu_a")
       .eq("commerce_id", commerce.id)
       .eq("kind", "evenement")
       .gt("valide_jusqu_a", new Date().toISOString())
@@ -199,19 +201,6 @@ function StandaloneSite() {
   // sections restent toujours en blanc pur pour un bon contraste.
   const pageBgClass = theme.isDark ? "bg-slate-950" : "bg-slate-50";
 
-  const eventDate = event ? new Date(event.valide_jusqu_a) : null;
-  const eventDaysLeft = eventDate
-    ? Math.ceil((eventDate.getTime() - Date.now()) / (24 * 3600 * 1000))
-    : null;
-  const eventUrgencyLabel =
-    eventDaysLeft === null
-      ? ""
-      : eventDaysLeft <= 0
-        ? "Aujourd'hui"
-        : eventDaysLeft === 1
-          ? "Demain"
-          : `Dans ${eventDaysLeft} jours`;
-
   return (
     <div className={`flex min-h-screen flex-col ${pageBgClass}`}>
       <div
@@ -281,6 +270,17 @@ function StandaloneSite() {
             </span>
           ) : null}
 
+          {event ? (
+            <FeaturedEventBlock
+              title={event.titre}
+              date={event.valide_jusqu_a}
+              description={event.description}
+              photoUrl={event.photo_url}
+              showUrgency
+              className="mx-auto mt-5 max-w-xl backdrop-blur-sm"
+            />
+          ) : null}
+
           <div className="mt-5 flex flex-wrap justify-center gap-2">
             {phoneHref ? (
               <a
@@ -311,33 +311,6 @@ function StandaloneSite() {
       </header>
 
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">
-        {/* Bannière événement premium : mise en avant tout en haut, avec badge d'urgence */}
-        {event && eventDate ? (
-          <section className="mb-6 overflow-hidden rounded-2xl bg-gradient-to-r from-[#1e293b] to-[#334155] p-6 text-white shadow-xl">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-promo px-3 py-1 text-xs font-bold uppercase tracking-wide text-promo-foreground">
-                <CalendarDays className="h-3.5 w-3.5" /> Événement à venir
-              </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-bold uppercase tracking-wide">
-                {eventUrgencyLabel}
-              </span>
-            </div>
-            <h2 className="mt-3 font-display text-2xl font-extrabold">{event.titre}</h2>
-            <p className="mt-1 text-sm font-medium text-white/70">
-              {eventDate.toLocaleString("fr-FR", {
-                weekday: "long",
-                day: "numeric",
-                month: "long",
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </p>
-            {event.description ? (
-              <p className="mt-2 line-clamp-2 text-sm text-white/80">{event.description}</p>
-            ) : null}
-          </section>
-        ) : null}
-
         <div className="grid gap-6 lg:grid-cols-3 lg:items-start">
           <div className="space-y-6 lg:col-span-2">
             {/* Offres & Promotions : jusqu'à 3, en liste verticale */}

@@ -1,11 +1,12 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { Phone, Navigation, Clock, Flame, CalendarDays } from "lucide-react";
+import { Phone, Navigation, Clock, Flame } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { GoogleRatingStars } from "@/components/GoogleRatingStars";
 import { CouponButton } from "@/components/CouponButton";
 import { ActivateOfferButton } from "@/components/ActivateOfferButton";
 import { FavoriteButton } from "@/components/FavoriteButton";
+import { FeaturedEventBlock } from "@/components/FeaturedEventBlock";
 import { InstallAppBanner } from "@/components/InstallAppBanner";
 import { getOffer, type CategoryKey, type Offer } from "@/lib/placeducoin-data";
 import { supabase } from "@/lib/supabase";
@@ -91,21 +92,6 @@ async function loadRealOffer(slug: string): Promise<Offer | null> {
   };
 }
 
-// Fuseau fixé : la page est rendue côté serveur (UTC) puis hydratée dans le navigateur, les deux
-// doivent afficher la même date. "Le 31 oct. · 18h00" (l'heure est omise si elle vaut minuit).
-function formatEventDate(iso: string) {
-  const date = new Date(iso);
-  const day = date.toLocaleDateString("fr-FR", {
-    day: "numeric",
-    month: "short",
-    timeZone: "Europe/Paris",
-  });
-  const time = date
-    .toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })
-    .replace(":", "h");
-  return time === "00h00" ? `Le ${day}` : `Le ${day} · ${time}`;
-}
-
 export const Route = createFileRoute("/commerce/$slug")({
   loader: async ({ params }) => {
     const offer = (await loadRealOffer(params.slug)) ?? getOffer(params.slug);
@@ -170,34 +156,13 @@ function ShopSite() {
           />
           <p className="mt-1 text-sm text-primary-foreground/60">{offer.address}</p>
           {offer.featuredEvent ? (
-            <section
-              aria-label="Événement à la Une"
-              className="mt-5 flex gap-3 rounded-2xl bg-primary-foreground/10 p-4 ring-1 ring-primary-foreground/20"
-            >
-              {offer.featuredEvent.photoUrl ? (
-                <img
-                  src={offer.featuredEvent.photoUrl}
-                  alt=""
-                  className="h-20 w-20 shrink-0 rounded-xl bg-primary-foreground/10 object-cover"
-                />
-              ) : null}
-              <div className="min-w-0">
-                <span className="inline-flex items-center gap-1 rounded-full bg-promo px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-promo-foreground">
-                  <CalendarDays className="h-3.5 w-3.5" /> Événement à la Une
-                </span>
-                <h2 className="mt-2 break-words font-display text-xl font-extrabold leading-tight">
-                  {offer.featuredEvent.title}
-                </h2>
-                <p className="mt-0.5 text-sm font-semibold text-primary-foreground/90">
-                  {formatEventDate(offer.featuredEvent.date)}
-                </p>
-                {offer.featuredEvent.description ? (
-                  <p className="mt-1 line-clamp-3 text-sm text-primary-foreground/80">
-                    {offer.featuredEvent.description}
-                  </p>
-                ) : null}
-              </div>
-            </section>
+            <FeaturedEventBlock
+              title={offer.featuredEvent.title}
+              date={offer.featuredEvent.date}
+              description={offer.featuredEvent.description}
+              photoUrl={offer.featuredEvent.photoUrl}
+              className="mt-5"
+            />
           ) : null}
           <div className="mt-5 flex flex-wrap gap-2">
             <a
