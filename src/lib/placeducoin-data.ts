@@ -98,6 +98,9 @@ export type CommerceListing = {
   city: string;
   /** Quartier/secteur de la fiche (table quartiers), null si non précisé. */
   quartierId?: string | null;
+  /** Position GPS enregistrée par le commerçant (carte de l'accueil), si renseignée. */
+  latitude?: number | null;
+  longitude?: number | null;
   distanceKm: number;
   address: string;
   phone: string;

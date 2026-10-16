@@ -1,12 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Search, MapPin, ChevronDown, Megaphone, Building2 } from "lucide-react";
+import { Search, MapPin, ChevronDown, Megaphone, Building2, Map as MapIcon } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { SponsorBanner } from "@/components/SponsorBanner";
 import { BottomSponsorBanner } from "@/components/BottomSponsorBanner";
 import { InstallAppBanner } from "@/components/InstallAppBanner";
 import { PushOptInCard } from "@/components/PushOptIn";
+import { CommerceMap } from "@/components/CommerceMap";
 import { OfferCard } from "@/components/OfferCard";
 import { RadiusSelector } from "@/components/RadiusSelector";
 import {
@@ -44,8 +45,16 @@ export const Route = createFileRoute("/")({
   component: Marketplace,
 });
 
-type Ville = { id: string; nom: string; slug: string; codes_postaux: string[] };
+type Ville = {
+  id: string;
+  nom: string;
+  slug: string;
+  codes_postaux: string[];
+  insee_code: string | null;
+};
 type Quartier = { id: string; nom: string };
+
+const MAP_PREF_KEY = "spotlocal:home-map";
 type PublicNotice = {
   id: string;
   titre: string;
@@ -83,6 +92,8 @@ type CommerceRow = {
   google_rating: number | null;
   google_review_count: number | null;
   quartier_id: string | null;
+  latitude: number | null;
+  longitude: number | null;
   promos: PromoEmbed[];
 };
 
@@ -126,6 +137,8 @@ function mapCommerceToListing(row: CommerceRow, fallbackCity: string): CommerceL
     category: row.category,
     city: fallbackCity,
     quartierId: row.quartier_id,
+    latitude: row.latitude,
+    longitude: row.longitude,
     distanceKm: 0,
     address: row.adresse ?? "",
     phone: row.telephone ?? "",
@@ -188,6 +201,28 @@ function Marketplace() {
   const [cityOpen, setCityOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<CategoryKey | null>(null);
+  // Carte affichée d'office sur grand écran, repliée sur mobile (la liste reste visible sous les
+  // filtres) ; le choix du visiteur est mémorisé sur l'appareil.
+  const [showMap, setShowMap] = useState(false);
+  useEffect(() => {
+    let stored: string | null = null;
+    try {
+      stored = window.localStorage.getItem(MAP_PREF_KEY);
+    } catch {
+      // Stockage indisponible : valeur par défaut selon la taille d'écran.
+    }
+    setShowMap(stored === null ? window.innerWidth >= 1024 : stored === "1");
+  }, []);
+  const toggleMap = () => {
+    setShowMap((prev) => {
+      try {
+        window.localStorage.setItem(MAP_PREF_KEY, prev ? "0" : "1");
+      } catch {
+        // Le choix ne sera pas mémorisé.
+      }
+      return !prev;
+    });
+  };
   const { radiusKm, favoriteCategories, position } = useUserPrefs();
   const hasPosition = position !== null;
 
@@ -196,7 +231,7 @@ function Marketplace() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("villes")
-        .select("id, nom, slug, codes_postaux, commerces(count)")
+        .select("id, nom, slug, codes_postaux, insee_code, commerces(count)")
         .order("nom");
       if (error) throw error;
       return (data as unknown as (Ville & { commerces: { count: number }[] })[]).map(
@@ -245,7 +280,7 @@ function Marketplace() {
       const { data, error } = await supabase
         .from("commerces")
         .select(
-          "id, slug, nom, trade, category, adresse, telephone, photo_url, logo_url, description, horaires, theme_visuel, site_actif, boost_actif, boost_expires_at, google_rating, google_review_count, quartier_id, promos(id, titre, kind, photo_url, prix_avant, prix_maintenant, valide_jusqu_a, created_at)",
+          "id, slug, nom, trade, category, adresse, telephone, photo_url, logo_url, description, horaires, theme_visuel, site_actif, boost_actif, boost_expires_at, google_rating, google_review_count, quartier_id, latitude, longitude, promos(id, titre, kind, photo_url, prix_avant, prix_maintenant, valide_jusqu_a, created_at)",
         )
         .eq("ville_id", selectedVille?.id)
         .gt("promos.valide_jusqu_a", new Date().toISOString());
@@ -561,6 +596,27 @@ function Marketplace() {
           {hasPosition ? ` · Dans un rayon de ${radiusKm} km autour de vous` : ""}
         </p>
       </section>
+
+      {/* Carte OpenStreetMap des fiches affichées (ville, quartier, catégorie, recherche). */}
+      {selectedVille ? (
+        <section className="mx-auto max-w-6xl px-4 pb-4">
+          <button
+            type="button"
+            onClick={toggleMap}
+            aria-expanded={showMap}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary"
+          >
+            <MapIcon className="h-3.5 w-3.5" /> {showMap ? "Masquer la carte" : "Voir sur la carte"}
+          </button>
+          {showMap ? (
+            <CommerceMap
+              commerces={visibleCommerces}
+              inseeCode={selectedVille.insee_code}
+              className="mt-3 h-72 sm:h-96"
+            />
+          ) : null}
+        </section>
+      ) : null}
 
       {isSearching ? (
         /* Résultats de recherche : remplace tout le reste de la page, juste sous la barre */
