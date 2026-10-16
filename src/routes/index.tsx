@@ -52,7 +52,7 @@ type Ville = {
   codes_postaux: string[];
   insee_code: string | null;
 };
-type Quartier = { id: string; nom: string };
+type Quartier = { id: string; nom: string; code_postal: string };
 
 const MAP_PREF_KEY = "spotlocal:home-map";
 type PublicNotice = {
@@ -196,7 +196,20 @@ function matchesSearch(commerce: CommerceListing, normalizedQuery: string): bool
 
 function Marketplace() {
   const [selectedVille, setSelectedVille] = useState<Ville | null>(null);
-  const [selectedQuartierId, setSelectedQuartierId] = useState<string | null>(null);
+  // Le quartier choisi est mémorisé AVEC sa ville : dès que la ville change (liste, code postal,
+  // ville par défaut…), le filtre retombe de lui-même sur "Tout <ville>", sans état résiduel.
+  const [quartierSelection, setQuartierSelection] = useState<{
+    villeId: string;
+    quartierId: string;
+  } | null>(null);
+  const selectedQuartierId =
+    quartierSelection && quartierSelection.villeId === selectedVille?.id
+      ? quartierSelection.quartierId
+      : null;
+  const setSelectedQuartierId = (quartierId: string | null) =>
+    setQuartierSelection(
+      quartierId && selectedVille ? { villeId: selectedVille.id, quartierId } : null,
+    );
   const [cityQuery, setCityQuery] = useState("");
   const [cityOpen, setCityOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -302,14 +315,14 @@ function Marketplace() {
   const searchQuery = normalizeSearch(query);
   const isSearching = searchQuery.length > 0;
 
-  // Quartiers de la ville sélectionnée, limités à ceux qui ont au moins une fiche : un filtre qui
-  // ne renverrait aucun résultat n'est pas proposé.
+  // Tous les quartiers rattachés à la commune sélectionnée (table quartiers, créés par code postal
+  // depuis les fiches), y compris ceux qui n'ont pas encore de fiche (compteur à 0).
   const quartiersQuery = useQuery({
     queryKey: ["quartiers", "marketplace", selectedVille?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("quartiers")
-        .select("id, nom")
+        .select("id, nom, code_postal")
         .eq("ville_id", selectedVille!.id)
         .order("nom");
       if (error) throw error;
@@ -324,7 +337,13 @@ function Marketplace() {
     }
     return counts;
   }, [commercesQuery.data]);
-  const quartiers = (quartiersQuery.data ?? []).filter((q) => quartierCounts.has(q.id));
+  const quartiers = useMemo(
+    () =>
+      [...(quartiersQuery.data ?? [])].sort((a, b) =>
+        a.nom.localeCompare(b.nom, "fr", { sensitivity: "base", numeric: true }),
+      ),
+    [quartiersQuery.data],
+  );
   const activeQuartierId = quartiers.some((q) => q.id === selectedQuartierId)
     ? selectedQuartierId
     : null;
@@ -549,14 +568,18 @@ function Marketplace() {
                 <button
                   key={q.id}
                   type="button"
-                  onClick={() => setSelectedQuartierId((prev) => (prev === q.id ? null : q.id))}
+                  onClick={() => setSelectedQuartierId(activeQuartierId === q.id ? null : q.id)}
+                  title={`${q.nom} (${q.code_postal})`}
                   className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
                     activeQuartierId === q.id
                       ? "border-transparent bg-navy text-primary-foreground"
                       : "border-border bg-card text-foreground hover:bg-secondary"
                   }`}
                 >
-                  {q.nom} · {quartierCounts.get(q.id)}
+                  {q.nom} ·{" "}
+                  <span className={quartierCounts.has(q.id) ? "" : "opacity-60"}>
+                    {quartierCounts.get(q.id) ?? 0}
+                  </span>
                 </button>
               ))}
             </div>
@@ -680,11 +703,27 @@ function Marketplace() {
             visibleCommerces.length === 0 &&
             !(category === "locale" && notices.length > 0) ? (
               <p className="col-span-full text-sm text-muted-foreground">
-                {category === null
-                  ? hasPosition
-                    ? `Aucun commerce à moins de ${radiusKm} km à ${city}.`
-                    : `Aucun commerce à ${city} pour le moment.`
-                  : "Aucun commerce dans cette catégorie pour le moment."}
+                {activeQuartierId ? (
+                  <>
+                    Aucune fiche dans le quartier «{" "}
+                    {quartiers.find((q) => q.id === activeQuartierId)?.nom} » pour le moment.{" "}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedQuartierId(null)}
+                      className="font-semibold text-navy underline"
+                    >
+                      Voir tout {city}
+                    </button>
+                  </>
+                ) : category === null ? (
+                  hasPosition ? (
+                    `Aucun commerce à moins de ${radiusKm} km à ${city}.`
+                  ) : (
+                    `Aucun commerce à ${city} pour le moment.`
+                  )
+                ) : (
+                  "Aucun commerce dans cette catégorie pour le moment."
+                )}
               </p>
             ) : null}
           </div>
