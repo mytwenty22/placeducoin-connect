@@ -2530,14 +2530,16 @@ function BannerReservationCard({
                     ? "SIRET requis pour payer"
                     : `Payer ${price} € via Stripe`}
               </button>
-              <button
-                type="button"
-                disabled={reserveMutation.isPending}
-                onClick={() => reserveMutation.mutate()}
-                className="w-full rounded-xl border border-input bg-card py-3 text-sm font-bold text-foreground hover:bg-secondary disabled:opacity-60"
-              >
-                {reserveMutation.isPending ? "Réservation…" : "Réserver gratuitement (mode démo)"}
-              </button>
+              {import.meta.env.DEV ? (
+                <button
+                  type="button"
+                  disabled={reserveMutation.isPending}
+                  onClick={() => reserveMutation.mutate()}
+                  className="w-full rounded-xl border border-input bg-card py-3 text-sm font-bold text-foreground hover:bg-secondary disabled:opacity-60"
+                >
+                  {reserveMutation.isPending ? "Réservation…" : "Réserver gratuitement (mode démo)"}
+                </button>
+              ) : null}
             </div>
           )}
         </div>
@@ -2656,14 +2658,16 @@ function OptionsScreen({
                   ? "SIRET requis pour s'abonner"
                   : "S'abonner via Stripe"}
             </button>
-            <button
-              type="button"
-              disabled={pending}
-              onClick={onActivateSite}
-              className="w-full rounded-xl border border-input bg-card py-3 text-sm font-bold text-foreground hover:bg-secondary disabled:opacity-60"
-            >
-              {pending ? "Activation…" : "Activer gratuitement (mode démo)"}
-            </button>
+            {import.meta.env.DEV ? (
+              <button
+                type="button"
+                disabled={pending}
+                onClick={onActivateSite}
+                className="w-full rounded-xl border border-input bg-card py-3 text-sm font-bold text-foreground hover:bg-secondary disabled:opacity-60"
+              >
+                {pending ? "Activation…" : "Activer gratuitement (mode démo)"}
+              </button>
+            ) : null}
           </div>
         )}
       </article>
@@ -2738,18 +2742,20 @@ function OptionsScreen({
                       ? "Booster à la Une — 9 € via Stripe"
                       : "Payer 9 € via Stripe"}
             </button>
-            <button
-              type="button"
-              disabled={pending}
-              onClick={onActivateBoost}
-              className="w-full rounded-xl border border-input bg-card py-3 text-sm font-bold text-foreground hover:bg-secondary disabled:opacity-60"
-            >
-              {pending
-                ? "Activation…"
-                : vipEligible
-                  ? "Booster à la Une (mode démo)"
-                  : "Activer gratuitement (mode démo) — 24h"}
-            </button>
+            {import.meta.env.DEV ? (
+              <button
+                type="button"
+                disabled={pending}
+                onClick={onActivateBoost}
+                className="w-full rounded-xl border border-input bg-card py-3 text-sm font-bold text-foreground hover:bg-secondary disabled:opacity-60"
+              >
+                {pending
+                  ? "Activation…"
+                  : vipEligible
+                    ? "Booster à la Une (mode démo)"
+                    : "Activer gratuitement (mode démo) — 24h"}
+              </button>
+            ) : null}
           </div>
         )}
       </article>
@@ -2791,10 +2797,12 @@ function OptionsScreen({
         </article>
       ) : null}
 
-      <p className="text-center text-xs text-muted-foreground">
-        Mode démo — aucun paiement réel n'est effectué. L'activation gratuite, elle, est bien
-        enregistrée sur votre fiche.
-      </p>
+      {import.meta.env.DEV ? (
+        <p className="text-center text-xs text-muted-foreground">
+          Mode démo — aucun paiement réel n'est effectué. L'activation gratuite, elle, est bien
+          enregistrée sur votre fiche.
+        </p>
+      ) : null}
     </div>
   );
 }
