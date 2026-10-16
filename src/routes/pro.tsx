@@ -32,6 +32,7 @@ import { SponsorBanner } from "@/components/SponsorBanner";
 import { OfferCard } from "@/components/OfferCard";
 import { ConversionStats } from "@/components/ConversionStats";
 import { PosterButton } from "@/components/PosterButton";
+import { ProQuickGuide } from "@/components/ProQuickGuide";
 import { ShopLocationField } from "@/components/ShopLocationField";
 import { LocalityFields } from "@/components/LocalityFields";
 import { resolveLocality, validateLocality, type LocalityValue } from "@/lib/locality";
@@ -616,6 +617,14 @@ function ProDashboard({ userId }: { userId: string }) {
 
       <div className="mt-3">
         <PosterButton commerce={commerce} />
+      </div>
+
+      <div className="mt-6">
+        <ProQuickGuide
+          commerce={commerce}
+          isAssociation={accountType === "association"}
+          onNavigate={setScreen}
+        />
       </div>
 
       <div className="mt-6">

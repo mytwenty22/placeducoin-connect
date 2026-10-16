@@ -1,6 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { sendAlertEmail } from "../_shared/resend.ts";
+import { sendPushToVille } from "../_shared/web-push.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -74,6 +75,14 @@ Deno.serve(async (req) => {
     const sent = results.filter((r) => r.ok).length;
     console.log("send-promo-alerts: résultats =", JSON.stringify(results));
 
+    // Notifications push "bons plans du quartier" (navigateurs abonnés pour cette commune).
+    const push = await sendPushToVille(adminClient, commerce.ville_id, commerce.category, {
+      title: `Nouvelle offre chez ${commerce.nom}`,
+      body: promo.titre,
+      url: `/commerce/${commerce.slug}`,
+      tag: `promo-${promo.id}`,
+    });
+
     // Notification en base pour les clients connectés qui ont ce commerce en favori -- visible dans
     // l'écran Notifications de l'app même s'ils ne naviguent pas dessus au moment de la publication.
     const { data: favUsers, error: favError } = await adminClient
@@ -95,7 +104,7 @@ Deno.serve(async (req) => {
       if (notifError) console.error("send-promo-alerts: échec insertion notifications", notifError);
     }
 
-    return new Response(JSON.stringify({ sent, results }), {
+    return new Response(JSON.stringify({ sent, push, results }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {

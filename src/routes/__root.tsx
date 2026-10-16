@@ -14,6 +14,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
 import { UserPrefsProvider } from "@/lib/user-prefs";
+import { startInstallTracking } from "@/lib/pwa-install";
 
 function NotFoundComponent() {
   return (
@@ -141,6 +142,7 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   useEffect(() => {
+    startInstallTracking();
     if (import.meta.env.PROD) {
       void import("virtual:pwa-register").then(({ registerSW }) => registerSW({ immediate: true }));
     }

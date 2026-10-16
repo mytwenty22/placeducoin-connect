@@ -51,6 +51,8 @@ export default defineConfig({
           // must always be fresh -- never served from the PWA cache. Only the app shell and
           // static assets are precached/cached; everything else falls through to the network.
           navigateFallbackDenylist: [/^\/api\//],
+          // Gestionnaires push / clic sur notification (public/push-sw.js).
+          importScripts: ["/push-sw.js"],
           runtimeCaching: [
             {
               urlPattern: ({ url }) => url.hostname.endsWith(".supabase.co"),

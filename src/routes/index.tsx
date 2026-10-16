@@ -5,6 +5,8 @@ import { Search, MapPin, ChevronDown, Megaphone, Building2 } from "lucide-react"
 import { AppHeader } from "@/components/AppHeader";
 import { SponsorBanner } from "@/components/SponsorBanner";
 import { BottomSponsorBanner } from "@/components/BottomSponsorBanner";
+import { InstallAppBanner } from "@/components/InstallAppBanner";
+import { PushOptInCard } from "@/components/PushOptIn";
 import { OfferCard } from "@/components/OfferCard";
 import { RadiusSelector } from "@/components/RadiusSelector";
 import {
@@ -630,6 +632,12 @@ function Marketplace() {
               </p>
             ) : null}
           </div>
+
+          {selectedVille ? (
+            <div className="mx-auto mt-8 max-w-xl">
+              <PushOptInCard villeId={selectedVille.id} villeNom={selectedVille.nom} />
+            </div>
+          ) : null}
         </section>
       )}
 
@@ -673,6 +681,8 @@ function Marketplace() {
           Conditions Générales de Vente & Mentions Légales
         </Link>
       </footer>
+
+      <InstallAppBanner />
     </div>
   );
 }

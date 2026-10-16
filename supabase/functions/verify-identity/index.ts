@@ -1,9 +1,12 @@
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { sendAlertEmail } from "../_shared/resend.ts";
+import { welcomeEmail } from "../_shared/welcome-email.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const SITE_URL = Deno.env.get("SITE_URL") ?? "https://spotlocal.fr";
 
 // API publique et gratuite de l'annuaire des entreprises (sans clé, ~7 requêtes/s par IP).
 const SEARCH_URL = "https://recherche-entreprises.api.gouv.fr/search";
@@ -52,6 +55,40 @@ async function checkSiret(siret: string): Promise<Outcome> {
   return { status: "refuse", reason: "SIRET introuvable au répertoire Sirene." };
 }
 
+// E-mail de bienvenue, une seule fois par compte : la ligne est "réservée" (welcome_email_sent_at)
+// avant l'envoi, ce qui évite un doublon si deux onglets appellent la fonction en même temps.
+// En cas d'échec Resend, la réservation est levée pour qu'un prochain appel réessaie.
+async function sendWelcomeOnce(
+  admin: SupabaseClient,
+  user: { id: string; email?: string | undefined },
+  role: string,
+  legalName: string | null,
+) {
+  if (!user.email || (role !== "pro" && role !== "association")) return;
+  const { data: claimed, error } = await admin
+    .from("profiles")
+    .update({ welcome_email_sent_at: new Date().toISOString() })
+    .eq("id", user.id)
+    .is("welcome_email_sent_at", null)
+    .select("id");
+  if (error || !claimed || claimed.length === 0) return;
+
+  const { data: commerce } = await admin
+    .from("commerces")
+    .select("nom")
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  const { subject, html } = welcomeEmail({
+    siteUrl: SITE_URL,
+    name: (commerce?.nom as string | undefined) ?? legalName,
+    isAssociation: role === "association",
+  });
+  const result = await sendAlertEmail(user.email, subject, html);
+  if (!result.ok) {
+    await admin.from("profiles").update({ welcome_email_sent_at: null }).eq("id", user.id);
+  }
+}
+
 async function checkRna(rna: string): Promise<Outcome> {
   const results = await search(rna);
   const match = results.find((r) => r.complements?.identifiant_association === rna);
@@ -77,7 +114,7 @@ Deno.serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const { data: profile, error: profileError } = await admin
       .from("profiles")
-      .select("siret, rna, verification_status")
+      .select("siret, rna, verification_status, role")
       .eq("id", user.id)
       .maybeSingle();
     if (profileError) throw profileError;
@@ -116,6 +153,17 @@ Deno.serve(async (req) => {
       update = profile.rna ? update.eq("rna", profile.rna) : update.is("rna", null);
       const { error: updateError } = await update;
       if (updateError) throw updateError;
+    }
+
+    // Compte vérifié, ou association dont le RNA attend une vérification manuelle : le compte est
+    // utilisable, on envoie le mode d'emploi. Jamais pour un identifiant refusé.
+    if (outcome.status !== "refuse") {
+      await sendWelcomeOnce(
+        admin,
+        user,
+        profile.role as string,
+        outcome.status === "verifie" ? outcome.legalName : null,
+      );
     }
 
     return json(outcome);

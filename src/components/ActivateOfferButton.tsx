@@ -6,6 +6,7 @@ import { useSession } from "@/hooks/use-session";
 import { GeoPositionError, getCurrentPositionOnce, positionErrorMessage } from "@/lib/geo";
 import { supabase } from "@/lib/supabase";
 import { logStatEvent } from "@/lib/stats-tracking";
+import { offerInstallOnFirstCoupon } from "@/lib/pwa-install";
 
 // Au-delà, la précision annoncée par le GPS est trop faible pour prouver une présence dans un
 // rayon de 100 m (position "réseau" d'un ordinateur, GPS pas encore verrouillé en intérieur…).
@@ -219,6 +220,8 @@ export function ActivateOfferButton({
 
   function handleStart() {
     setFeedback(null);
+    // Premier coupon : on propose d'ajouter SpotLocal à l'écran d'accueil (une seule fois).
+    offerInstallOnFirstCoupon();
     if (!userId) {
       setFeedback({ tone: "info", text: "Connectez-vous pour utiliser ce coupon sur place." });
       return;

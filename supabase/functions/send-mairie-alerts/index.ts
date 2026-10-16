@@ -1,6 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { sendAlertEmail } from "../_shared/resend.ts";
+import { sendPushToVille } from "../_shared/web-push.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -56,7 +57,7 @@ Deno.serve(async (req) => {
       <p><strong>${info.type}</strong></p>
       <p>${info.titre}</p>
       ${info.corps ? `<p>${info.corps}</p>` : ""}
-      <p><a href="${SITE_URL}/mairie">Voir sur SpotLocal</a></p>
+      <p><a href="${SITE_URL}/">Voir sur SpotLocal</a></p>
     `;
 
     const results = await Promise.all(
@@ -65,7 +66,16 @@ Deno.serve(async (req) => {
     const sent = results.filter((r) => r.ok).length;
     console.log("send-mairie-alerts: résultats =", JSON.stringify(results));
 
-    return new Response(JSON.stringify({ sent, results }), {
+    // Notifications push "bons plans du quartier" : actualités locales (catégorie "locale").
+    const push = await sendPushToVille(adminClient, info.ville_id, "locale", {
+      title: `Mairie — ${info.titre}`,
+      body: info.corps ? String(info.corps).slice(0, 140) : info.type,
+      // /mairie est l'espace de connexion des agents : les citoyens lisent les infos sur l'accueil.
+      url: "/",
+      tag: `mairie-${info.id}`,
+    });
+
+    return new Response(JSON.stringify({ sent, push, results }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
