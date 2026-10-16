@@ -379,14 +379,14 @@ function Marketplace() {
       <AppHeader />
 
       {/* Barre supérieure de recherche */}
-      <section className="w-full overflow-hidden border-b border-border/60 bg-gradient-navy pb-8 pt-6 text-primary-foreground">
+      <section className="w-full overflow-hidden border-b border-border/60 bg-gradient-navy pb-5 pt-4 text-primary-foreground sm:pb-8 sm:pt-6">
         <div className="mx-auto max-w-6xl px-4">
           <h1 className="break-words font-display text-xl font-extrabold sm:text-2xl lg:text-3xl">
             {city
               ? `Les bons plans de ${city}, en direct de vos commerçants`
               : "Les bons plans de vos commerçants, en direct"}
           </h1>
-          <p className="mt-1 text-sm text-primary-foreground/70">
+          <p className="mt-1 hidden text-sm text-primary-foreground/70 sm:block">
             Toute la vie de votre quartier, vos commerces et votre mairie en un clic.
           </p>
 
@@ -394,7 +394,7 @@ function Marketplace() {
             <RadiusSelector />
           </div>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-[minmax(0,260px)_minmax(0,1fr)]">
+          <div className="mt-4 grid gap-3 sm:mt-5 sm:grid-cols-[minmax(0,260px)_minmax(0,1fr)]">
             <div className="relative">
               <button
                 type="button"
@@ -487,30 +487,33 @@ function Marketplace() {
       ) : null}
 
       {/* Onglets catégories : juste sous la barre de recherche */}
-      <section className="mx-auto max-w-6xl px-4 pt-6">
+      {/* Sur mobile, quartiers et catégories tiennent chacun sur une seule ligne défilable au doigt
+          (bord à bord, sans barre de défilement) pour que la liste des fiches reste visible juste
+          en dessous ; à partir de sm, les catégories repassent sur plusieurs lignes. */}
+      <section className="mx-auto max-w-6xl px-4 pb-3 pt-4 sm:pb-4 sm:pt-6">
         {quartiers.length > 0 ? (
-          <div className="mb-3">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <div className="mb-2 sm:mb-3">
+            <span className="hidden text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:block">
               Quartier / secteur
             </span>
-            <div className="mt-1.5 flex gap-2 overflow-x-auto pb-1">
+            <div className="scrollbar-none -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:mt-1.5 sm:px-0">
               <button
                 type="button"
                 onClick={() => setSelectedQuartierId(null)}
-                className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
                   activeQuartierId === null
                     ? "border-transparent bg-navy text-primary-foreground"
                     : "border-border bg-card text-foreground hover:bg-secondary"
                 }`}
               >
-                Tout {city}
+                <MapPin className="h-3.5 w-3.5" /> Tout {city}
               </button>
               {quartiers.map((q) => (
                 <button
                   key={q.id}
                   type="button"
                   onClick={() => setSelectedQuartierId((prev) => (prev === q.id ? null : q.id))}
-                  className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
                     activeQuartierId === q.id
                       ? "border-transparent bg-navy text-primary-foreground"
                       : "border-border bg-card text-foreground hover:bg-secondary"
@@ -522,11 +525,11 @@ function Marketplace() {
             </div>
           </div>
         ) : null}
-        <div className="flex flex-wrap gap-2">
+        <div className="scrollbar-none -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
           <button
             type="button"
             onClick={() => setCategory(null)}
-            className={`rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${
+            className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors sm:px-4 sm:py-2 sm:text-sm ${
               category === null
                 ? "border-transparent bg-primary text-primary-foreground"
                 : "border-border bg-card text-foreground hover:bg-secondary"
@@ -539,7 +542,7 @@ function Marketplace() {
               key={c.key}
               type="button"
               onClick={() => setCategory((prev) => (prev === c.key ? null : c.key))}
-              className={`rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${
+              className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors sm:px-4 sm:py-2 sm:text-sm ${
                 category === c.key
                   ? "border-transparent bg-primary text-primary-foreground"
                   : "border-border bg-card text-foreground hover:bg-secondary"
@@ -549,7 +552,7 @@ function Marketplace() {
             </button>
           ))}
         </div>
-        <p className="mt-3 text-xs text-muted-foreground">
+        <p className="mt-3 hidden text-xs text-muted-foreground sm:block">
           {category === null
             ? "Tous les commerces, toutes catégories confondues."
             : CATEGORIES.find((c) => c.key === category)?.sub.join(" · ")}

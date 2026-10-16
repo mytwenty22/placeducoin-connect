@@ -1,6 +1,6 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { Phone, Navigation, Clock, Flame } from "lucide-react";
+import { Phone, Navigation, Clock, Flame, CalendarDays } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { GoogleRatingStars } from "@/components/GoogleRatingStars";
 import { CouponButton } from "@/components/CouponButton";
@@ -22,15 +22,28 @@ async function loadRealOffer(slug: string): Promise<Offer | null> {
     .maybeSingle();
   if (!commerce) return null;
 
-  const { data: promo } = await supabase
-    .from("promos")
-    .select("id, titre, kind, photo_url, prix_avant, prix_maintenant, valide_jusqu_a")
-    .eq("commerce_id", commerce.id)
-    .in("kind", ["promo", "arrivage"])
-    .gt("valide_jusqu_a", new Date().toISOString())
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const nowIso = new Date().toISOString();
+  const [{ data: promo }, { data: event }] = await Promise.all([
+    supabase
+      .from("promos")
+      .select("id, titre, kind, photo_url, prix_avant, prix_maintenant, valide_jusqu_a")
+      .eq("commerce_id", commerce.id)
+      .in("kind", ["promo", "arrivage"])
+      .gt("valide_jusqu_a", nowIso)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    // Pour un événement, valide_jusqu_a est sa date/heure : le plus proche à venir est "à la Une".
+    supabase
+      .from("promos")
+      .select("titre, description, photo_url, valide_jusqu_a")
+      .eq("commerce_id", commerce.id)
+      .eq("kind", "evenement")
+      .gt("valide_jusqu_a", nowIso)
+      .order("valide_jusqu_a", { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+  ]);
 
   const villeEmbed = Array.isArray(commerce.villes) ? commerce.villes[0] : commerce.villes;
   const endsInHours = promo
@@ -65,7 +78,32 @@ async function loadRealOffer(slug: string): Promise<Offer | null> {
     ...(photoUrl ? { photoUrl } : {}),
     ...(commerce.google_rating != null ? { googleRating: commerce.google_rating } : {}),
     googleReviewCount: commerce.google_review_count,
+    ...(event
+      ? {
+          featuredEvent: {
+            title: event.titre,
+            date: event.valide_jusqu_a,
+            ...(event.description ? { description: event.description } : {}),
+            ...(event.photo_url ? { photoUrl: event.photo_url } : {}),
+          },
+        }
+      : {}),
   };
+}
+
+// Fuseau fixé : la page est rendue côté serveur (UTC) puis hydratée dans le navigateur, les deux
+// doivent afficher la même date. "Le 31 oct. · 18h00" (l'heure est omise si elle vaut minuit).
+function formatEventDate(iso: string) {
+  const date = new Date(iso);
+  const day = date.toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "short",
+    timeZone: "Europe/Paris",
+  });
+  const time = date
+    .toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" })
+    .replace(":", "h");
+  return time === "00h00" ? `Le ${day}` : `Le ${day} · ${time}`;
 }
 
 export const Route = createFileRoute("/commerce/$slug")({
@@ -85,7 +123,8 @@ export const Route = createFileRoute("/commerce/$slug")({
     }
     const { offer } = loaderData;
     const title = `${offer.shop} — ${offer.trade} à ${offer.city}`;
-    const description = `${offer.title}. Horaires, tarifs et coordonnées de ${offer.shop} à ${offer.city}.`;
+    const highlight = offer.title || offer.featuredEvent?.title;
+    const description = `${highlight ? `${highlight}. ` : ""}Horaires, tarifs et coordonnées de ${offer.shop} à ${offer.city}.`;
     return {
       meta: [
         { title },
@@ -130,6 +169,36 @@ function ShopSite() {
             mutedTextClassName="text-primary-foreground/60"
           />
           <p className="mt-1 text-sm text-primary-foreground/60">{offer.address}</p>
+          {offer.featuredEvent ? (
+            <section
+              aria-label="Événement à la Une"
+              className="mt-5 flex gap-3 rounded-2xl bg-primary-foreground/10 p-4 ring-1 ring-primary-foreground/20"
+            >
+              {offer.featuredEvent.photoUrl ? (
+                <img
+                  src={offer.featuredEvent.photoUrl}
+                  alt=""
+                  className="h-20 w-20 shrink-0 rounded-xl bg-primary-foreground/10 object-cover"
+                />
+              ) : null}
+              <div className="min-w-0">
+                <span className="inline-flex items-center gap-1 rounded-full bg-promo px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-promo-foreground">
+                  <CalendarDays className="h-3.5 w-3.5" /> Événement à la Une
+                </span>
+                <h2 className="mt-2 break-words font-display text-xl font-extrabold leading-tight">
+                  {offer.featuredEvent.title}
+                </h2>
+                <p className="mt-0.5 text-sm font-semibold text-primary-foreground/90">
+                  {formatEventDate(offer.featuredEvent.date)}
+                </p>
+                {offer.featuredEvent.description ? (
+                  <p className="mt-1 line-clamp-3 text-sm text-primary-foreground/80">
+                    {offer.featuredEvent.description}
+                  </p>
+                ) : null}
+              </div>
+            </section>
+          ) : null}
           <div className="mt-5 flex flex-wrap gap-2">
             <a
               href={`tel:${offer.phone.replace(/\s/g, "")}`}

@@ -9,7 +9,6 @@
   --font-sans: "Plus Jakarta Sans", "Segoe UI", sans-serif;
 }
 
-
 /*
  * Design system definition.
  *
@@ -118,7 +117,8 @@
   --mairie-foreground: oklch(0.99 0 0);
   --gradient-navy: linear-gradient(135deg, oklch(0.22 0.062 264), oklch(0.34 0.07 258));
   --gradient-promo: linear-gradient(135deg, oklch(0.578 0.216 22), oklch(0.65 0.19 35));
-  --shadow-card: 0 1px 2px oklch(0.24 0.062 264 / 0.06), 0 8px 24px -12px oklch(0.24 0.062 264 / 0.18);
+  --shadow-card:
+    0 1px 2px oklch(0.24 0.062 264 / 0.06), 0 8px 24px -12px oklch(0.24 0.062 264 / 0.18);
   --shadow-lift: 0 18px 42px -18px oklch(0.24 0.062 264 / 0.4);
 }
 
@@ -179,7 +179,9 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-2xl);
   box-shadow: var(--shadow-card);
-  transition: box-shadow 200ms ease, transform 200ms ease;
+  transition:
+    box-shadow 200ms ease,
+    transform 200ms ease;
 }
 
 @utility bg-gradient-navy {
@@ -190,6 +192,14 @@
   background-image: var(--gradient-promo);
 }
 
+/* Rangées de filtres défilables au doigt sur mobile, sans barre de défilement visible. */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 @utility hover-lift {
   &:hover {
     transform: translateY(-3px);
@@ -198,7 +208,9 @@
 }
 
 @layer base {
-  h1, h2, h3 {
+  h1,
+  h2,
+  h3 {
     font-family: var(--font-display);
     letter-spacing: -0.02em;
   }

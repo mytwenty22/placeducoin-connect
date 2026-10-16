@@ -43,8 +43,6 @@ export type Offer = {
   trade: string;
   category: CategoryKey;
   city: string;
-  /** Quartier/secteur de la fiche (table quartiers), null si non précisé. */
-  quartierId?: string | null;
   distanceKm: number;
   title: string;
   kind: "promo" | "arrivage" | "evenement";
@@ -71,6 +69,8 @@ export type Offer = {
   createdAt?: string;
   googleRating?: number;
   googleReviewCount?: number;
+  /** Prochain événement à venir de la fiche, mis en avant dans l'en-tête de la page détaillée. */
+  featuredEvent?: { title: string; date: string; description?: string; photoUrl?: string };
 };
 
 // Une "offre" ponctuelle (promo/arrivage/événement) affichée dans le carrousel d'une carte
