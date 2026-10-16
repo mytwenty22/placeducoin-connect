@@ -43,8 +43,22 @@ import type { Horaire } from "@/lib/horaires";
 import { THEME_OPTIONS, THEME_STYLES, type ThemeVisuel } from "@/lib/site-theme";
 import { getReadableTextColor } from "@/lib/color";
 import { isBoostActive } from "@/lib/boost";
+import {
+  canCompanyPay,
+  hasAssociationIdentifier,
+  resolveIdentity,
+  VERIFICATION_LABELS,
+  type EntityIdentity,
+} from "@/lib/entity-id";
+import {
+  EntityIdentityForm,
+  IdentifierFields,
+  type IdentifierInput,
+} from "@/components/EntityIdentityForm";
 
 type AccountType = "pro" | "association";
+
+const ENTITY_TYPE_BY_ACCOUNT = { pro: "company", association: "association" } as const;
 
 export const Route = createFileRoute("/pro")({
   head: () => ({
@@ -65,7 +79,7 @@ export const Route = createFileRoute("/pro")({
   component: ProSpace,
 });
 
-type Profile = { role: "mairie" | "pro" | "association" | "admin" };
+type Profile = { role: "mairie" | "pro" | "association" | "admin" } & EntityIdentity;
 type Ville = { id: string; nom: string; slug?: string };
 type Commerce = {
   id: string;
@@ -212,6 +226,7 @@ function ProSignupForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [accountType, setAccountType] = useState<AccountType>("pro");
+  const [identifier, setIdentifier] = useState<IdentifierInput>({ identifier: "", pending: false });
   const [loading, setLoading] = useState(false);
 
   return (
@@ -219,8 +234,22 @@ function ProSignupForm() {
       className="surface-card mx-auto max-w-sm space-y-4 p-5"
       onSubmit={async (e) => {
         e.preventDefault();
+        const resolved = resolveIdentity(ENTITY_TYPE_BY_ACCOUNT[accountType], identifier, {
+          allowPending: true,
+        });
+        if (!resolved.ok) {
+          toast.error(resolved.error);
+          return;
+        }
         setLoading(true);
-        const { data, error } = await supabase.auth.signUp({ email, password });
+        // Type de compte et identifiant voyagent aussi dans les métadonnées du compte : si la
+        // confirmation par e-mail est active, il n'y a pas encore de session ici et le profil
+        // sera créé à la première connexion (ensureProfileMutation) à partir de ces métadonnées.
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { data: { account_type: accountType, ...resolved.patch } },
+        });
         if (error) {
           toast.error(error.message);
           setLoading(false);
@@ -229,7 +258,10 @@ function ProSignupForm() {
         if (data.session && data.user) {
           const { error: profileError } = await supabase
             .from("profiles")
-            .upsert({ id: data.user.id, role: accountType }, { onConflict: "id" });
+            .upsert(
+              { id: data.user.id, role: accountType, ...resolved.patch },
+              { onConflict: "id" },
+            );
           if (profileError) toast.error(profileError.message);
         } else {
           toast.success("Compte créé — vérifiez votre boîte mail pour confirmer votre adresse.");
@@ -251,14 +283,17 @@ function ProSignupForm() {
         <div className="mt-1.5 grid grid-cols-2 gap-2">
           {(
             [
-              { key: "pro" as const, label: "Commerçant" },
-              { key: "association" as const, label: "Association" },
+              { key: "pro" as const, label: "Entreprise" },
+              { key: "association" as const, label: "Association / Organisme à but non lucratif" },
             ] as const
           ).map((t) => (
             <button
               key={t.key}
               type="button"
-              onClick={() => setAccountType(t.key)}
+              onClick={() => {
+                setAccountType(t.key);
+                setIdentifier({ identifier: "", pending: false });
+              }}
               className={`rounded-xl border px-3 py-2.5 text-sm font-semibold transition-colors ${
                 accountType === t.key
                   ? "border-transparent bg-navy text-primary-foreground"
@@ -269,7 +304,19 @@ function ProSignupForm() {
             </button>
           ))}
         </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          {accountType === "association"
+            ? "Gratuit et illimité : fiche et événements publiés sans frais dès votre N° RNA renseigné. Sponsoring facultatif."
+            : "Fiche gratuite. Un N° SIRET valide sera demandé pour les formules payantes (mise en avant, haut de page)."}
+        </p>
       </div>
+
+      <IdentifierFields
+        entityType={ENTITY_TYPE_BY_ACCOUNT[accountType]}
+        value={identifier}
+        onChange={setIdentifier}
+        allowPending
+      />
 
       <label className="block">
         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -318,7 +365,7 @@ function ProDashboard({ userId }: { userId: string }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("role")
+        .select("role, entity_type, siret, rna, immatriculation_en_cours, verification_status")
         .eq("id", userId)
         .maybeSingle();
       if (error) throw error;
@@ -329,9 +376,23 @@ function ProDashboard({ userId }: { userId: string }) {
   const attemptedProfileCreateRef = useRef(false);
   const ensureProfileMutation = useMutation({
     mutationFn: async () => {
+      // Reprend le type de compte et l'identifiant choisis à l'inscription (cas où la
+      // confirmation e-mail a empêché de créer le profil à ce moment-là). Une saisie invalide ou
+      // absente retombe sur un compte entreprise sans identifiant, comme avant.
+      const { data: userData } = await supabase.auth.getUser();
+      const meta = (userData.user?.user_metadata ?? {}) as Record<string, unknown>;
+      const role: AccountType = meta["account_type"] === "association" ? "association" : "pro";
+      const resolved = resolveIdentity(
+        ENTITY_TYPE_BY_ACCOUNT[role],
+        {
+          identifier: String(meta["siret"] ?? meta["rna"] ?? ""),
+          pending: meta["immatriculation_en_cours"] === true,
+        },
+        { allowPending: true },
+      );
       const { error } = await supabase
         .from("profiles")
-        .upsert({ id: userId, role: "pro" }, { onConflict: "id" });
+        .upsert({ id: userId, role, ...(resolved.ok ? resolved.patch : {}) }, { onConflict: "id" });
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["profile", userId] }),
@@ -458,6 +519,23 @@ function ProDashboard({ userId }: { userId: string }) {
   }
 
   const accountType: AccountType = profileQuery.data.role;
+  const profile = profileQuery.data;
+  const refreshProfile = () => queryClient.invalidateQueries({ queryKey: ["profile", userId] });
+
+  // Associations : l'accès gratuit et illimité (fiche + événements) s'ouvre dès qu'un RNA ou un
+  // SIRET est renseigné -- y compris pour les comptes créés avant cette règle.
+  if (accountType === "association" && !hasAssociationIdentifier(profile)) {
+    return (
+      <EntityIdentityForm
+        userId={userId}
+        entityType="association"
+        title="Identifiez votre association"
+        description="Renseignez votre N° RNA (ou SIRET) pour débloquer gratuitement votre fiche et la publication illimitée d'événements."
+        submitLabel="Débloquer mon accès gratuit"
+        onSaved={refreshProfile}
+      />
+    );
+  }
 
   if (commerceQuery.isLoading) return <p className="text-sm text-muted-foreground">Chargement…</p>;
 
@@ -545,6 +623,8 @@ function ProDashboard({ userId }: { userId: string }) {
             commerce={commerce}
             userId={userId}
             accountType={accountType}
+            profile={profile}
+            onProfileUpdated={refreshProfile}
             pending={activateMutation.isPending}
             cancelPending={cancelMutation.isPending}
             checkoutPending={checkoutMutation.isPending}
@@ -2007,7 +2087,15 @@ function bannerWindow(tier: BannerTierKey, monthKey: string): { start: Date; end
   };
 }
 
-function BannerReservationCard({ commerce, userId }: { commerce: Commerce; userId: string }) {
+function BannerReservationCard({
+  commerce,
+  userId,
+  paymentLocked,
+}: {
+  commerce: Commerce;
+  userId: string;
+  paymentLocked: boolean;
+}) {
   const queryClient = useQueryClient();
   const [position, setPosition] = useState<"top" | "bottom">("top");
   const [tier, setTier] = useState<BannerTierKey>("test");
@@ -2432,11 +2520,15 @@ function BannerReservationCard({ commerce, userId }: { commerce: Commerce; userI
             <div className="space-y-2">
               <button
                 type="button"
-                disabled={checkoutMutation.isPending}
+                disabled={checkoutMutation.isPending || paymentLocked}
                 onClick={() => checkoutMutation.mutate()}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-promo py-3 text-sm font-bold text-promo-foreground disabled:opacity-60"
               >
-                {checkoutMutation.isPending ? "Redirection…" : `Payer ${price} € via Stripe`}
+                {checkoutMutation.isPending
+                  ? "Redirection…"
+                  : paymentLocked
+                    ? "SIRET requis pour payer"
+                    : `Payer ${price} € via Stripe`}
               </button>
               <button
                 type="button"
@@ -2458,6 +2550,8 @@ function OptionsScreen({
   commerce,
   userId,
   accountType,
+  profile,
+  onProfileUpdated,
   pending,
   cancelPending,
   checkoutPending,
@@ -2471,6 +2565,8 @@ function OptionsScreen({
   commerce: Commerce;
   userId: string;
   accountType: AccountType;
+  profile: Profile;
+  onProfileUpdated: () => void;
   pending: boolean;
   cancelPending: boolean;
   checkoutPending: boolean;
@@ -2486,9 +2582,38 @@ function OptionsScreen({
   // La section VIP "À la Une" n'accepte que les abonnés Site Pro qui cumulent le boost -- un
   // commerce gratuit ne peut jamais y prétendre, quel que soit son statut Vedette.
   const vipEligible = commerce.site_actif;
+  const isAssociation = accountType === "association";
+  // Entreprises : création de fiche gratuite, mais toute formule payante exige un SIRET valide
+  // (revérifié côté serveur dans create-checkout-session). Les associations paient librement.
+  const paymentLocked = !isAssociation && !canCompanyPay(profile);
+  const identifierLabel = profile.siret
+    ? `SIRET ${profile.siret}`
+    : profile.rna
+      ? `RNA ${profile.rna}`
+      : null;
 
   return (
     <div className="space-y-4">
+      {paymentLocked ? (
+        <EntityIdentityForm
+          userId={userId}
+          entityType="company"
+          title="SIRET requis pour les formules payantes"
+          description={
+            profile.verification_status === "refuse"
+              ? "Votre SIRET a été refusé. Renseignez un N° SIRET valide ou contactez-nous."
+              : "Votre fiche reste gratuite. Pour souscrire la mise en avant ou le haut de page, renseignez le N° SIRET de votre entreprise."
+          }
+          submitLabel="Enregistrer mon SIRET"
+          onSaved={onProfileUpdated}
+        />
+      ) : identifierLabel ? (
+        <p className="flex items-center gap-2 rounded-xl bg-secondary px-3 py-2.5 text-xs text-muted-foreground">
+          <CheckCircle2 className="h-4 w-4 shrink-0 text-navy" />
+          {identifierLabel} — {VERIFICATION_LABELS[profile.verification_status]}
+        </p>
+      ) : null}
+
       <article className="surface-card p-5">
         <div className="flex items-center gap-2">
           <Rocket className="h-5 w-5 shrink-0 text-navy" />
@@ -2521,11 +2646,15 @@ function OptionsScreen({
           <div className="mt-4 space-y-2">
             <button
               type="button"
-              disabled={checkoutPending}
+              disabled={checkoutPending || paymentLocked}
               onClick={onCheckoutSite}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground disabled:opacity-60"
             >
-              {checkoutPending ? "Redirection…" : "S'abonner via Stripe"}
+              {checkoutPending
+                ? "Redirection…"
+                : paymentLocked
+                  ? "SIRET requis pour s'abonner"
+                  : "S'abonner via Stripe"}
             </button>
             <button
               type="button"
@@ -2543,11 +2672,20 @@ function OptionsScreen({
         <div className="flex items-center gap-2">
           <Zap className="h-5 w-5 shrink-0 text-promo" />
           <h2 className="font-display text-lg font-extrabold text-foreground">
-            {vipEligible ? "Booster à la Une · 9 € / 24h" : "Option Vedette · 9 € / 24h"}
+            {isAssociation
+              ? "Sponsoriser ma fiche / mon événement · 9 € / 24h"
+              : vipEligible
+                ? "Booster à la Une · 9 € / 24h"
+                : "Option Vedette · 9 € / 24h"}
           </h2>
         </div>
         <p className="mt-2 text-sm text-muted-foreground">
-          {vipEligible ? (
+          {isAssociation ? (
+            <>
+              Facultatif : votre fiche et vos événements restent gratuits et illimités. Le
+              sponsoring les place tout en haut du fil d'actualité pendant 24h.
+            </>
+          ) : vipEligible ? (
             <>
               En plus de votre visibilité prioritaire dans le fil général, l'Option À la Une (9 €)
               place votre fiche dans le carrousel VIP situé entre la bannière du haut et le fil.
@@ -2586,15 +2724,19 @@ function OptionsScreen({
           <div className="mt-4 space-y-2">
             <button
               type="button"
-              disabled={checkoutPending}
+              disabled={checkoutPending || paymentLocked}
               onClick={onCheckoutBoost}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-promo py-3 text-sm font-bold text-promo-foreground disabled:opacity-60"
             >
               {checkoutPending
                 ? "Redirection…"
-                : vipEligible
-                  ? "Booster à la Une — 9 € via Stripe"
-                  : "Payer 9 € via Stripe"}
+                : paymentLocked
+                  ? "SIRET requis pour payer"
+                  : isAssociation
+                    ? "Sponsoriser — 9 € via Stripe"
+                    : vipEligible
+                      ? "Booster à la Une — 9 € via Stripe"
+                      : "Payer 9 € via Stripe"}
             </button>
             <button
               type="button"
@@ -2612,7 +2754,9 @@ function OptionsScreen({
         )}
       </article>
 
-      {accountType === "pro" ? <BannerReservationCard commerce={commerce} userId={userId} /> : null}
+      {accountType === "pro" ? (
+        <BannerReservationCard commerce={commerce} userId={userId} paymentLocked={paymentLocked} />
+      ) : null}
 
       {import.meta.env.DEV ? (
         <article className="surface-card p-5">

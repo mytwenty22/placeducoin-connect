@@ -1,6 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Stripe from "npm:stripe@17.4.0";
 import { corsHeaders } from "../_shared/cors.ts";
+import { isValidSiret } from "../_shared/siret.ts";
 
 const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") ?? "", {
   apiVersion: "2024-12-18.acacia",
@@ -64,6 +65,27 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
     const type = body.type as "site_pro" | "boost" | "banner";
+
+    // Freemium : une association paie librement (option "Sponsoriser"), une entreprise doit avoir
+    // renseigné un SIRET valide avant toute formule payante -- "En cours d'immatriculation" ne
+    // suffit pas. Revérifié ici car le client peut être contourné.
+    const { data: profile, error: profileError } = await userClient
+      .from("profiles")
+      .select("role, siret, verification_status")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (profileError) throw profileError;
+    if (
+      profile?.role === "pro" &&
+      (!isValidSiret(profile.siret) || profile.verification_status === "refuse")
+    ) {
+      return new Response(
+        JSON.stringify({
+          error: "Un N° SIRET valide est requis pour souscrire une formule payante.",
+        }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     const { data: commerce, error: commerceError } = await userClient
       .from("commerces")
