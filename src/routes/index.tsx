@@ -11,6 +11,13 @@ import { CommerceMap } from "@/components/CommerceMap";
 import { OfferCard } from "@/components/OfferCard";
 import { RadiusSelector } from "@/components/RadiusSelector";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   CATEGORIES,
   type CategoryKey,
   type CommerceListing,
@@ -52,7 +59,10 @@ type Ville = {
   codes_postaux: string[];
   insee_code: string | null;
 };
-type Quartier = { id: string; nom: string; code_postal: string };
+type Quartier = { id: string; nom: string; code_postal: string; ville_id: string };
+
+// Valeur de l'option "Tous les quartiers" (Radix Select n'accepte pas de valeur vide).
+const ALL_QUARTIERS = "all";
 
 const MAP_PREF_KEY = "spotlocal:home-map";
 type PublicNotice = {
@@ -322,7 +332,7 @@ function Marketplace() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("quartiers")
-        .select("id, nom, code_postal")
+        .select("id, nom, code_postal, ville_id")
         .eq("ville_id", selectedVille!.id)
         .order("nom");
       if (error) throw error;
@@ -339,10 +349,12 @@ function Marketplace() {
   }, [commercesQuery.data]);
   const quartiers = useMemo(
     () =>
-      [...(quartiersQuery.data ?? [])].sort((a, b) =>
-        a.nom.localeCompare(b.nom, "fr", { sensitivity: "base", numeric: true }),
-      ),
-    [quartiersQuery.data],
+      // Filtre strict sur la ville affichée : jamais un quartier d'une autre commune, même le temps
+      // que la requête de la nouvelle ville arrive.
+      (quartiersQuery.data ?? [])
+        .filter((q) => q.ville_id === selectedVille?.id)
+        .sort((a, b) => a.nom.localeCompare(b.nom, "fr", { sensitivity: "base", numeric: true })),
+    [quartiersQuery.data, selectedVille?.id],
   );
   const activeQuartierId = quartiers.some((q) => q.id === selectedQuartierId)
     ? selectedQuartierId
@@ -547,42 +559,47 @@ function Marketplace() {
           (bord à bord, sans barre de défilement) pour que la liste des fiches reste visible juste
           en dessous ; à partir de sm, les catégories repassent sur plusieurs lignes. */}
       <section className="mx-auto max-w-6xl px-4 pb-3 pt-4 sm:pb-4 sm:pt-6">
-        {quartiers.length > 0 ? (
-          <div className="mb-2 sm:mb-3">
-            <span className="hidden text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:block">
+        {/* Filtre quartier : masqué si la commune n'a aucun quartier en base. La clé par ville
+            remonte le menu à chaque changement de commune (aucune sélection résiduelle). */}
+        {quartiers.length > 0 && selectedVille ? (
+          <div className="mb-2 flex items-center gap-2 sm:mb-3">
+            <label
+              htmlFor="quartier-filter"
+              className="hidden shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:block"
+            >
               Quartier / secteur
-            </span>
-            <div className="scrollbar-none -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:mt-1.5 sm:px-0">
-              <button
-                type="button"
-                onClick={() => setSelectedQuartierId(null)}
-                className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                  activeQuartierId === null
-                    ? "border-transparent bg-navy text-primary-foreground"
-                    : "border-border bg-card text-foreground hover:bg-secondary"
+            </label>
+            <Select
+              key={selectedVille.id}
+              value={activeQuartierId ?? ALL_QUARTIERS}
+              onValueChange={(value) =>
+                setSelectedQuartierId(value === ALL_QUARTIERS ? null : value)
+              }
+            >
+              <SelectTrigger
+                id="quartier-filter"
+                aria-label="Filtrer par quartier"
+                className={`h-9 w-full rounded-full text-xs font-semibold sm:w-72 ${
+                  activeQuartierId ? "border-navy bg-navy text-primary-foreground" : "bg-card"
                 }`}
               >
-                <MapPin className="h-3.5 w-3.5" /> Tout {city}
-              </button>
-              {quartiers.map((q) => (
-                <button
-                  key={q.id}
-                  type="button"
-                  onClick={() => setSelectedQuartierId(activeQuartierId === q.id ? null : q.id)}
-                  title={`${q.nom} (${q.code_postal})`}
-                  className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                    activeQuartierId === q.id
-                      ? "border-transparent bg-navy text-primary-foreground"
-                      : "border-border bg-card text-foreground hover:bg-secondary"
-                  }`}
-                >
-                  {q.nom} ·{" "}
-                  <span className={quartierCounts.has(q.id) ? "" : "opacity-60"}>
-                    {quartierCounts.get(q.id) ?? 0}
+                {/* div et non span : le déclencheur applique line-clamp à ses span enfants. */}
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <MapPin className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">
+                    <SelectValue />
                   </span>
-                </button>
-              ))}
-            </div>
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_QUARTIERS}>Tous les quartiers de {city}</SelectItem>
+                {quartiers.map((q) => (
+                  <SelectItem key={q.id} value={q.id}>
+                    {q.nom} ({quartierCounts.get(q.id) ?? 0})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         ) : null}
         <div className="scrollbar-none -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
