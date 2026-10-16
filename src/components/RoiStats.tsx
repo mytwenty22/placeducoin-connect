@@ -55,14 +55,9 @@ function rate(part: number, whole: number) {
   return `${Math.round((part / whole) * 100)} %`;
 }
 
-/**
- * Widget "Statistiques ROI" de l'Espace Pro : vues de la fiche et des offres, coupons générés et
- * validés en caisse, chiffre d'affaires estimé, et courbe des 30 derniers jours.
- */
-export function RoiStats({ commerceId }: { commerceId: string }) {
-  const [series, setSeries] = useState<Series>("views");
-
-  const statsQuery = useQuery({
+/** Statistiques ROI d'un commerce (RPC commerce_roi_stats), partagées par le widget et le résumé. */
+function useRoiStats(commerceId: string) {
+  return useQuery({
     queryKey: ["commerce-roi-stats", commerceId],
     queryFn: async (): Promise<RoiStats> => {
       const { data, error } = await supabase.rpc("commerce_roi_stats", {
@@ -80,6 +75,16 @@ export function RoiStats({ commerceId }: { commerceId: string }) {
     },
     refetchInterval: 60_000,
   });
+}
+
+/**
+ * Widget "Statistiques ROI" de l'Espace Pro : vues de la fiche et des offres, coupons générés et
+ * validés en caisse, chiffre d'affaires estimé, et courbe des 30 derniers jours.
+ */
+export function RoiStats({ commerceId }: { commerceId: string }) {
+  const [series, setSeries] = useState<Series>("views");
+
+  const statsQuery = useRoiStats(commerceId);
 
   const chartData = useMemo(
     () =>
@@ -249,6 +254,119 @@ export function RoiStats({ commerceId }: { commerceId: string }) {
         validés sur place (position GPS vérifiée) ou confirmés par vous depuis l'onglet Promo Flash.{" "}
         <strong>CA estimé</strong> : somme des prix promo des coupons validés sur place.
       </p>
+    </section>
+  );
+}
+
+/** Variation des vues sur les 7 derniers jours par rapport aux 7 précédents, ou null sans base. */
+function weeklyTrend(daily: RoiStats["daily"]) {
+  const views = daily.map((d) => d.fiche_views + d.offer_views);
+  const last = views.slice(-7).reduce((a, b) => a + b, 0);
+  const previous = views.slice(-14, -7).reduce((a, b) => a + b, 0);
+  if (previous === 0) return null;
+  return Math.round(((last - previous) / previous) * 100);
+}
+
+/**
+ * Résumé ROI du tableau de bord /pro : les chiffres des 30 derniers jours en un coup d'œil, une
+ * mini-courbe des vues et un lien vers l'onglet Statistiques.
+ */
+export function RoiSummaryCard({
+  commerceId,
+  onOpenDetails,
+}: {
+  commerceId: string;
+  onOpenDetails: () => void;
+}) {
+  const statsQuery = useRoiStats(commerceId);
+  const data = statsQuery.data;
+  const trend = data ? weeklyTrend(data.daily) : null;
+  const spark = useMemo(
+    () => (data?.daily ?? []).map((d) => ({ day: d.day, views: d.fiche_views + d.offer_views })),
+    [data],
+  );
+
+  if (statsQuery.isError) return null;
+
+  const figures = data
+    ? [
+        { label: "Vues", value: data.period.fiche_views + data.period.offer_views, icon: Eye },
+        { label: "Coupons générés", value: data.period.coupons_generated, icon: Ticket },
+        { label: "Validés en caisse", value: data.period.coupons_redeemed, icon: BadgeCheck },
+      ]
+    : [];
+
+  return (
+    <section className="surface-card p-4" aria-labelledby="roi-summary-title">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2
+            id="roi-summary-title"
+            className="font-display text-base font-extrabold leading-tight text-foreground"
+          >
+            Vos résultats
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            30 derniers jours
+            {trend !== null ? (
+              <span
+                className={`ml-1.5 font-semibold ${trend >= 0 ? "text-emerald-600" : "text-promo"}`}
+              >
+                · vues {trend >= 0 ? "+" : ""}
+                {trend} % cette semaine
+              </span>
+            ) : null}
+          </p>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="inline-flex items-center gap-1 font-display text-lg font-extrabold text-emerald-600">
+            <TrendingUp className="h-4 w-4" />{" "}
+            {data ? euros.format(data.period.estimated_revenue) : "…"}
+          </p>
+          <p className="text-[11px] text-muted-foreground">CA estimé</p>
+        </div>
+      </div>
+
+      {data ? (
+        <>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            {figures.map(({ label, value, icon: Icon }) => (
+              <div key={label} className="rounded-xl bg-secondary px-2.5 py-2">
+                <p className="inline-flex items-center gap-1 font-display text-xl font-extrabold text-foreground">
+                  <Icon className="h-3.5 w-3.5 text-muted-foreground" /> {integer.format(value)}
+                </p>
+                <p className="text-[11px] leading-tight text-muted-foreground">{label}</p>
+              </div>
+            ))}
+          </div>
+          <ChartContainer
+            config={{ views: { label: "Vues", color: "var(--navy)" } }}
+            className="mt-3 aspect-auto h-12 w-full"
+          >
+            <AreaChart data={spark} margin={{ left: 0, right: 0, top: 4, bottom: 0 }}>
+              <Area
+                dataKey="views"
+                type="monotone"
+                stroke="var(--color-views)"
+                fill="var(--color-views)"
+                fillOpacity={0.12}
+                strokeWidth={2}
+                isAnimationActive={false}
+              />
+            </AreaChart>
+          </ChartContainer>
+        </>
+      ) : (
+        <p className="mt-3 text-sm text-muted-foreground">Chargement…</p>
+      )}
+
+      <button
+        type="button"
+        onClick={onOpenDetails}
+        className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-navy hover:underline"
+      >
+        Voir le détail des statistiques →
+      </button>
     </section>
   );
 }

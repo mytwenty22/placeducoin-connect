@@ -28,7 +28,7 @@ import { EmailPasswordLogin } from "@/components/EmailPasswordLogin";
 import { SponsorBanner } from "@/components/SponsorBanner";
 import { OfferCard } from "@/components/OfferCard";
 import { ConversionStats } from "@/components/ConversionStats";
-import { RoiStats } from "@/components/RoiStats";
+import { RoiStats, RoiSummaryCard } from "@/components/RoiStats";
 import { PosterButton } from "@/components/PosterButton";
 import { ProQuickGuide } from "@/components/ProQuickGuide";
 import { ShopLocationField } from "@/components/ShopLocationField";
@@ -616,6 +616,13 @@ function ProDashboard({ userId }: { userId: string }) {
       <div className="mt-3">
         <PosterButton commerce={commerce} />
       </div>
+
+      {/* Résumé ROI, sauf sur l'onglet Statistiques qui affiche déjà le détail. */}
+      {screen !== "stats" ? (
+        <div className="mt-6">
+          <RoiSummaryCard commerceId={commerce.id} onOpenDetails={() => setScreen("stats")} />
+        </div>
+      ) : null}
 
       <div className="mt-6">
         <ProQuickGuide
