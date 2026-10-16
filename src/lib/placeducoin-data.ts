@@ -43,6 +43,8 @@ export type Offer = {
   trade: string;
   category: CategoryKey;
   city: string;
+  /** Quartier/secteur de la fiche (table quartiers), null si non précisé. */
+  quartierId?: string | null;
   distanceKm: number;
   title: string;
   kind: "promo" | "arrivage" | "evenement";
@@ -94,6 +96,8 @@ export type CommerceListing = {
   trade: string;
   category: CategoryKey;
   city: string;
+  /** Quartier/secteur de la fiche (table quartiers), null si non précisé. */
+  quartierId?: string | null;
   distanceKm: number;
   address: string;
   phone: string;

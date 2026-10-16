@@ -42,7 +42,8 @@ export const Route = createFileRoute("/")({
   component: Marketplace,
 });
 
-type Ville = { id: string; nom: string; slug: string };
+type Ville = { id: string; nom: string; slug: string; codes_postaux: string[] };
+type Quartier = { id: string; nom: string };
 type PublicNotice = {
   id: string;
   titre: string;
@@ -79,6 +80,7 @@ type CommerceRow = {
   boost_expires_at: string | null;
   google_rating: number | null;
   google_review_count: number | null;
+  quartier_id: string | null;
   promos: PromoEmbed[];
 };
 
@@ -121,6 +123,7 @@ function mapCommerceToListing(row: CommerceRow, fallbackCity: string): CommerceL
     trade: row.trade,
     category: row.category,
     city: fallbackCity,
+    quartierId: row.quartier_id,
     distanceKm: 0,
     address: row.adresse ?? "",
     phone: row.telephone ?? "",
@@ -178,6 +181,7 @@ function matchesSearch(commerce: CommerceListing, normalizedQuery: string): bool
 
 function Marketplace() {
   const [selectedVille, setSelectedVille] = useState<Ville | null>(null);
+  const [selectedQuartierId, setSelectedQuartierId] = useState<string | null>(null);
   const [cityQuery, setCityQuery] = useState("");
   const [cityOpen, setCityOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -188,23 +192,41 @@ function Marketplace() {
   const villesQuery = useQuery({
     queryKey: ["villes"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("villes").select("id, nom, slug").order("nom");
+      const { data, error } = await supabase
+        .from("villes")
+        .select("id, nom, slug, codes_postaux, commerces(count)")
+        .order("nom");
       if (error) throw error;
-      return data as Ville[];
+      return (data as unknown as (Ville & { commerces: { count: number }[] })[]).map(
+        ({ commerces, ...v }) => ({ ...v, commerceCount: commerces[0]?.count ?? 0 }),
+      );
     },
   });
 
+  // Les villes sont désormais créées à la volée par les Pros (ensure-ville) : par défaut on ouvre
+  // la commune la plus fournie plutôt que la première par ordre alphabétique.
   useEffect(() => {
-    const first = villesQuery.data?.[0];
-    if (!selectedVille && first) {
-      setSelectedVille(first);
+    const villes = villesQuery.data ?? [];
+    const busiest = villes.reduce<(typeof villes)[number] | undefined>(
+      (best, v) => (!best || v.commerceCount > best.commerceCount ? v : best),
+      undefined,
+    );
+    if (!selectedVille && busiest) {
+      setSelectedVille(busiest);
     }
   }, [selectedVille, villesQuery.data]);
 
   const citySuggestions = useMemo(
     () =>
       (villesQuery.data ?? [])
-        .filter((v) => v.nom.toLowerCase().includes(cityQuery.toLowerCase()))
+        // Recherche par nom de commune ou par code postal (33000, 336…).
+        .filter((v) => {
+          const q = cityQuery.trim().toLowerCase();
+          return (
+            v.nom.toLowerCase().includes(q) ||
+            (/^d+$/.test(q) && v.codes_postaux.some((cp) => cp.startsWith(q)))
+          );
+        })
         .slice(0, 6),
     [villesQuery.data, cityQuery],
   );
@@ -221,7 +243,7 @@ function Marketplace() {
       const { data, error } = await supabase
         .from("commerces")
         .select(
-          "id, slug, nom, trade, category, adresse, telephone, photo_url, logo_url, description, horaires, theme_visuel, site_actif, boost_actif, boost_expires_at, google_rating, google_review_count, promos(id, titre, kind, photo_url, prix_avant, prix_maintenant, valide_jusqu_a, created_at)",
+          "id, slug, nom, trade, category, adresse, telephone, photo_url, logo_url, description, horaires, theme_visuel, site_actif, boost_actif, boost_expires_at, google_rating, google_review_count, quartier_id, promos(id, titre, kind, photo_url, prix_avant, prix_maintenant, valide_jusqu_a, created_at)",
         )
         .eq("ville_id", selectedVille?.id)
         .gt("promos.valide_jusqu_a", new Date().toISOString());
@@ -243,14 +265,42 @@ function Marketplace() {
   const searchQuery = normalizeSearch(query);
   const isSearching = searchQuery.length > 0;
 
+  // Quartiers de la ville sélectionnée, limités à ceux qui ont au moins une fiche : un filtre qui
+  // ne renverrait aucun résultat n'est pas proposé.
+  const quartiersQuery = useQuery({
+    queryKey: ["quartiers", "marketplace", selectedVille?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("quartiers")
+        .select("id, nom")
+        .eq("ville_id", selectedVille!.id)
+        .order("nom");
+      if (error) throw error;
+      return data as Quartier[];
+    },
+    enabled: !!selectedVille,
+  });
+  const quartierCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const c of commercesQuery.data ?? []) {
+      if (c.quartierId) counts.set(c.quartierId, (counts.get(c.quartierId) ?? 0) + 1);
+    }
+    return counts;
+  }, [commercesQuery.data]);
+  const quartiers = (quartiersQuery.data ?? []).filter((q) => quartierCounts.has(q.id));
+  const activeQuartierId = quartiers.some((q) => q.id === selectedQuartierId)
+    ? selectedQuartierId
+    : null;
+
   const filtered = useMemo(() => {
-    const data = commercesQuery.data ?? [];
+    const all = commercesQuery.data ?? [];
+    const data = activeQuartierId ? all.filter((c) => c.quartierId === activeQuartierId) : all;
     if (isSearching) {
       return sortByTier(data.filter((c) => matchesSearch(c, searchQuery)));
     }
     if (category === null) return sortByTier(data);
     return sortByTier(data.filter((c) => c.category === category));
-  }, [commercesQuery.data, isSearching, searchQuery, category]);
+  }, [commercesQuery.data, activeQuartierId, isSearching, searchQuery, category]);
 
   const filteredWithDistance = withComputedDistance(filtered, position);
   const visibleCommerces = hasPosition
@@ -260,9 +310,13 @@ function Marketplace() {
   // Encart VIP "À la une" : réservé aux commerces qui cumulent Site Pro ET l'option Vedette 24h
   // en cours -- pas juste l'un ou l'autre. Dès que le boost expire (isBoostActive côté requête)
   // ou que l'abonnement Site Pro est annulé, le commerce en sort au prochain refetch/realtime.
-  const vip = hasPosition
-    ? commercesWithDistance.filter((c) => c.sponsored && c.premium && c.distanceKm <= radiusKm)
-    : commercesWithDistance.filter((c) => c.sponsored && c.premium);
+  const vip = commercesWithDistance.filter(
+    (c) =>
+      c.sponsored &&
+      c.premium &&
+      (!hasPosition || c.distanceKm <= radiusKm) &&
+      (!activeQuartierId || c.quartierId === activeQuartierId),
+  );
 
   const noticesQuery = useQuery({
     queryKey: ["infos-mairie-public", selectedVille?.id],
@@ -357,7 +411,7 @@ function Marketplace() {
                     autoFocus
                     value={cityQuery}
                     onChange={(e) => setCityQuery(e.target.value)}
-                    placeholder="Ville ou village…"
+                    placeholder="Ville, village ou code postal…"
                     className="w-full border-b border-border bg-transparent px-3 py-2.5 text-sm text-foreground outline-none"
                   />
                   <ul className="max-h-56 overflow-auto py-1">
@@ -367,6 +421,7 @@ function Marketplace() {
                           type="button"
                           onClick={() => {
                             setSelectedVille(v);
+                            setSelectedQuartierId(null);
                             setCityOpen(false);
                             setCityQuery("");
                           }}
@@ -433,6 +488,40 @@ function Marketplace() {
 
       {/* Onglets catégories : juste sous la barre de recherche */}
       <section className="mx-auto max-w-6xl px-4 pt-6">
+        {quartiers.length > 0 ? (
+          <div className="mb-3">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Quartier / secteur
+            </span>
+            <div className="mt-1.5 flex gap-2 overflow-x-auto pb-1">
+              <button
+                type="button"
+                onClick={() => setSelectedQuartierId(null)}
+                className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  activeQuartierId === null
+                    ? "border-transparent bg-navy text-primary-foreground"
+                    : "border-border bg-card text-foreground hover:bg-secondary"
+                }`}
+              >
+                Tout {city}
+              </button>
+              {quartiers.map((q) => (
+                <button
+                  key={q.id}
+                  type="button"
+                  onClick={() => setSelectedQuartierId((prev) => (prev === q.id ? null : q.id))}
+                  className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    activeQuartierId === q.id
+                      ? "border-transparent bg-navy text-primary-foreground"
+                      : "border-border bg-card text-foreground hover:bg-secondary"
+                  }`}
+                >
+                  {q.nom} · {quartierCounts.get(q.id)}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
         <div className="flex flex-wrap gap-2">
           <button
             type="button"

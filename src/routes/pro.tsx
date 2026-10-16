@@ -33,6 +33,8 @@ import { OfferCard } from "@/components/OfferCard";
 import { ConversionStats } from "@/components/ConversionStats";
 import { PosterButton } from "@/components/PosterButton";
 import { ShopLocationField } from "@/components/ShopLocationField";
+import { LocalityFields } from "@/components/LocalityFields";
+import { resolveLocality, validateLocality, type LocalityValue } from "@/lib/locality";
 import { geocodeAddress } from "@/lib/geocode";
 import { supabase } from "@/lib/supabase";
 import { addNotification } from "@/lib/notifications-store";
@@ -88,6 +90,7 @@ type Commerce = {
   trade: string;
   category: CategoryKey;
   ville_id: string;
+  quartier_id: string | null;
   adresse: string | null;
   code_postal: string | null;
   latitude: number | null;
@@ -436,7 +439,7 @@ function ProDashboard({ userId }: { userId: string }) {
       const { data, error } = await supabase
         .from("commerces")
         .select(
-          "id, slug, nom, trade, category, ville_id, adresse, code_postal, latitude, longitude, telephone, photo_url, logo_url, description, horaires, instagram, galerie_urls, video_url, theme_visuel, site_actif, boost_actif, boost_expires_at",
+          "id, slug, nom, trade, category, ville_id, quartier_id, adresse, code_postal, latitude, longitude, telephone, photo_url, logo_url, description, horaires, instagram, galerie_urls, video_url, theme_visuel, site_actif, boost_actif, boost_expires_at",
         )
         .eq("owner_id", userId)
         .maybeSingle();
@@ -721,6 +724,7 @@ async function insertCommerceWithUniqueSlug(input: {
   category: CategoryKey;
   adresse: string;
   code_postal: string;
+  quartier_id: string | null;
   telephone: string;
   latitude?: number;
   longitude?: number;
@@ -750,40 +754,40 @@ function CreateCommerceForm({
   const [category, setCategory] = useState<CategoryKey>(
     isAssociation ? "locale" : (CATEGORIES[0]?.key ?? "bouche"),
   );
-  const [villeId, setVilleId] = useState("");
   const [adresse, setAdresse] = useState("");
-  const [codePostal, setCodePostal] = useState("");
+  const [locality, setLocality] = useState<LocalityValue>({
+    codePostal: "",
+    insee: "",
+    quartierId: null,
+    newQuartier: null,
+  });
   const [telephone, setTelephone] = useState("");
   const [pending, setPending] = useState(false);
-
-  const villesQuery = useQuery({
-    queryKey: ["villes"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("villes").select("id, nom").order("nom");
-      if (error) throw error;
-      return data as Ville[];
-    },
-  });
+  const queryClient = useQueryClient();
 
   return (
     <form
       className="surface-card space-y-4 p-5"
       onSubmit={async (e) => {
         e.preventDefault();
-        if (!nom.trim() || !villeId) {
-          toast.error("Nom et ville sont requis.");
+        if (!nom.trim()) {
+          toast.error("Le nom est requis.");
           return;
         }
-        if (!POSTAL_CODE_REGEX.test(codePostal.trim())) {
-          toast.error("Code postal invalide (5 chiffres).");
+        const localityError = validateLocality(locality);
+        if (localityError) {
+          toast.error(localityError);
           return;
         }
         setPending(true);
         try {
+          const { villeId, quartierId } = await resolveLocality(locality);
+          void queryClient.invalidateQueries({ queryKey: ["quartiers"] });
+          void queryClient.invalidateQueries({ queryKey: ["villes"] });
           // Position GPS déduite de l'adresse pour l'activation des promos en caisse ; sans
           // résultat fiable la fiche est créée quand même, le commerçant la renseignera depuis
           // Mon Profil.
-          const position = await geocodeAddress(adresse, codePostal);
+          const position = await geocodeAddress(adresse, locality.codePostal);
           await insertCommerceWithUniqueSlug({
             owner_id: userId,
             ville_id: villeId,
@@ -791,7 +795,8 @@ function CreateCommerceForm({
             trade,
             category: isAssociation ? "locale" : category,
             adresse,
-            code_postal: codePostal.trim(),
+            code_postal: locality.codePostal,
+            quartier_id: quartierId,
             telephone,
             ...(position ? { latitude: position.lat, longitude: position.lng } : {}),
           });
@@ -853,32 +858,8 @@ function CreateCommerceForm({
         }
       />
 
-      <label className="block">
-        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Ville *
-        </span>
-        <select
-          required
-          value={villeId}
-          onChange={(e) => setVilleId(e.target.value)}
-          className="mt-1 w-full rounded-xl border border-input bg-card px-3 py-2.5 text-sm text-foreground outline-none focus:border-navy"
-        >
-          <option value="">{villesQuery.isLoading ? "Chargement…" : "Choisir une ville"}</option>
-          {villesQuery.data?.map((v) => (
-            <option key={v.id} value={v.id}>
-              {v.nom}
-            </option>
-          ))}
-        </select>
-      </label>
-
       <Field label="Adresse" value={adresse} onChange={setAdresse} placeholder="12 rue du Marché" />
-      <Field
-        label="Code postal *"
-        value={codePostal}
-        onChange={(v) => setCodePostal(v.replace(/[^\d]/g, "").slice(0, 5))}
-        placeholder="74000"
-      />
+      <LocalityFields value={locality} onChange={setLocality} adresse={adresse} />
       <Field
         label="Téléphone"
         value={telephone}
@@ -967,9 +948,14 @@ function ProfileScreen({
   const [trade, setTrade] = useState(commerce.trade);
   const [category, setCategory] = useState<CategoryKey>(commerce.category);
   const [savingCategory, setSavingCategory] = useState(false);
-  const [villeId, setVilleId] = useState(commerce.ville_id);
   const [adresse, setAdresse] = useState(commerce.adresse ?? "");
-  const [codePostal, setCodePostal] = useState(commerce.code_postal ?? "");
+  const [locality, setLocality] = useState<LocalityValue>({
+    codePostal: commerce.code_postal ?? "",
+    insee: "",
+    quartierId: commerce.quartier_id,
+    newQuartier: null,
+  });
+  const queryClient = useQueryClient();
   const [telephone, setTelephone] = useState(commerce.telephone ?? "");
   const [photoUrl, setPhotoUrl] = useState(commerce.photo_url ?? "");
   const [logoUrl, setLogoUrl] = useState(commerce.logo_url ?? "");
@@ -985,15 +971,6 @@ function ProfileScreen({
   const [uploadingGalerie, setUploadingGalerie] = useState(false);
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const [pending, setPending] = useState(false);
-
-  const villesQuery = useQuery({
-    queryKey: ["villes"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("villes").select("id, nom").order("nom");
-      if (error) throw error;
-      return data as Ville[];
-    },
-  });
 
   async function handleCategoryClick(key: CategoryKey) {
     if (key === category) return;
@@ -1128,23 +1105,38 @@ function ProfileScreen({
         className="surface-card space-y-4 p-5"
         onSubmit={async (e) => {
           e.preventDefault();
-          if (!villeId) {
-            toast.error("La ville est obligatoire.");
-            return;
-          }
-          if (!POSTAL_CODE_REGEX.test(codePostal.trim())) {
-            toast.error("Code postal invalide (5 chiffres).");
+          const localityError = validateLocality(locality);
+          if (localityError) {
+            toast.error(localityError);
             return;
           }
           setPending(true);
+          let resolved: { villeId: string; quartierId: string | null };
+          try {
+            resolved = await resolveLocality(locality);
+          } catch (localityFailure) {
+            setPending(false);
+            toast.error((localityFailure as Error).message);
+            return;
+          }
+          if (locality.newQuartier !== null) {
+            setLocality((prev) => ({
+              ...prev,
+              quartierId: resolved.quartierId,
+              newQuartier: null,
+            }));
+          }
+          void queryClient.invalidateQueries({ queryKey: ["quartiers"] });
+          void queryClient.invalidateQueries({ queryKey: ["villes"] });
           const { error } = await supabase
             .from("commerces")
             .update({
               nom,
               trade,
-              ville_id: villeId,
+              ville_id: resolved.villeId,
+              quartier_id: resolved.quartierId,
               adresse,
-              code_postal: codePostal.trim(),
+              code_postal: locality.codePostal,
               telephone,
               photo_url: photoUrl || null,
               logo_url: logoUrl || null,
@@ -1438,38 +1430,17 @@ function ProfileScreen({
           placeholder="Quelques phrases pour présenter votre commerce…"
           textarea
         />
-        <label className="block">
-          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Ville *
-          </span>
-          <select
-            required
-            value={villeId}
-            onChange={(e) => setVilleId(e.target.value)}
-            className="mt-1 w-full rounded-xl border border-input bg-card px-3 py-2.5 text-sm text-foreground outline-none focus:border-navy"
-          >
-            <option value="">{villesQuery.isLoading ? "Chargement…" : "Choisir une ville"}</option>
-            {villesQuery.data?.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.nom}
-              </option>
-            ))}
-          </select>
-          <span className="mt-1 block text-xs text-muted-foreground">
-            Rattache votre fiche à la bonne commune sur la Marketplace.
-          </span>
-        </label>
         <Field label="Adresse" value={adresse} onChange={setAdresse} />
-        <Field
-          label="Code postal *"
-          value={codePostal}
-          onChange={(v) => setCodePostal(v.replace(/[^\d]/g, "").slice(0, 5))}
-          placeholder="74000"
+        <LocalityFields
+          value={locality}
+          onChange={setLocality}
+          adresse={adresse}
+          initialVilleId={commerce.ville_id}
         />
         <ShopLocationField
           commerceId={commerce.id}
           adresse={adresse}
-          codePostal={codePostal}
+          codePostal={locality.codePostal}
           latitude={commerce.latitude}
           longitude={commerce.longitude}
           onUpdated={onUpdated}
