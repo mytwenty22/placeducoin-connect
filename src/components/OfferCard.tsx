@@ -1,4 +1,4 @@
-import { useState, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
   Clock,
@@ -13,6 +13,7 @@ import type { CommerceListing, PromoItem } from "@/lib/placeducoin-data";
 import { computeOpenStatus } from "@/lib/horaires";
 import { THEME_STYLES, DEFAULT_THEME } from "@/lib/site-theme";
 import { GoogleRatingStars } from "@/components/GoogleRatingStars";
+import { logOfferViewOnce } from "@/lib/stats-tracking";
 
 function countdown(hours: number) {
   if (hours < 1) return "Dernières minutes";
@@ -49,6 +50,7 @@ function PromoKindBadge({ kind }: { kind: PromoItem["kind"] }) {
 export function OfferCard({ commerce }: { commerce: CommerceListing }) {
   const navigate = useNavigate();
   const [activeIndex, setActiveIndex] = useState(0);
+  const cardRef = useRef<HTMLElement>(null);
 
   const openStatus = computeOpenStatus(commerce.horaires ?? []);
   const styles = THEME_STYLES[commerce.themeVisuel ?? DEFAULT_THEME];
@@ -62,6 +64,23 @@ export function OfferCard({ commerce }: { commerce: CommerceListing }) {
     ? ({ to: "/site/$slug", params: { slug: commerce.slug } } as const)
     : ({ to: "/commerce/$slug", params: { slug: commerce.slug } } as const);
 
+  // Statistique "Vues des offres" de l'Espace Pro : la carte doit être visible à moitié au moins.
+  useEffect(() => {
+    const node = cardRef.current;
+    if (!hasPromos || !node || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          logOfferViewOnce(commerce.id);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.5 },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasPromos, commerce.id]);
+
   function openFiche() {
     navigate(destination);
   }
@@ -73,6 +92,7 @@ export function OfferCard({ commerce }: { commerce: CommerceListing }) {
 
   return (
     <article
+      ref={cardRef}
       role="link"
       tabIndex={0}
       onClick={openFiche}

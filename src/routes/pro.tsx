@@ -19,9 +19,6 @@ import {
   Package,
   Upload,
   BarChart3,
-  Eye,
-  Search as SearchIcon,
-  Ticket,
   CheckCircle2,
   Megaphone,
   Ban,
@@ -31,6 +28,7 @@ import { EmailPasswordLogin } from "@/components/EmailPasswordLogin";
 import { SponsorBanner } from "@/components/SponsorBanner";
 import { OfferCard } from "@/components/OfferCard";
 import { ConversionStats } from "@/components/ConversionStats";
+import { RoiStats } from "@/components/RoiStats";
 import { PosterButton } from "@/components/PosterButton";
 import { ProQuickGuide } from "@/components/ProQuickGuide";
 import { ShopLocationField } from "@/components/ShopLocationField";
@@ -1952,18 +1950,6 @@ function PromoScreen({
   );
 }
 
-const STAT_TILES = [
-  { type: "app_view" as const, label: "Vues App", icon: Eye, tone: "text-navy" },
-  { type: "google_view" as const, label: "Vues Google (SEO)", icon: SearchIcon, tone: "text-navy" },
-  { type: "coupon_open" as const, label: "Coupons Ouverts", icon: Ticket, tone: "text-promo" },
-  {
-    type: "coupon_validated" as const,
-    label: "Coupons Validés",
-    icon: CheckCircle2,
-    tone: "text-emerald-600",
-  },
-];
-
 function StatsScreen({
   commerce,
   onGoToProfile,
@@ -1972,23 +1958,6 @@ function StatsScreen({
   onGoToProfile: () => void;
 }) {
   const commerceId = commerce.id;
-  const statsQuery = useQuery({
-    queryKey: ["commerce-stats", commerceId],
-    queryFn: async () => {
-      const counts = await Promise.all(
-        STAT_TILES.map(async ({ type }) => {
-          const { count, error } = await supabase
-            .from("commerce_stats_events")
-            .select("id", { count: "exact", head: true })
-            .eq("commerce_id", commerceId)
-            .eq("event_type", type);
-          if (error) throw new Error(error.message);
-          return [type, count ?? 0] as const;
-        }),
-      );
-      return Object.fromEntries(counts) as Record<(typeof STAT_TILES)[number]["type"], number>;
-    },
-  });
 
   return (
     <div className="space-y-4">
@@ -1999,32 +1968,7 @@ function StatsScreen({
         </p>
       </div>
 
-      {statsQuery.isLoading ? (
-        <p className="text-sm text-muted-foreground">Chargement…</p>
-      ) : statsQuery.isError ? (
-        <p className="text-sm text-foreground">
-          Erreur lors du chargement des statistiques : {(statsQuery.error as Error).message}
-        </p>
-      ) : (
-        <div className="grid grid-cols-2 gap-3">
-          {STAT_TILES.map(({ type, label, icon: Icon, tone }) => (
-            <article key={type} className="surface-card p-4">
-              <Icon className={`h-5 w-5 ${tone}`} />
-              <p className="mt-2 font-display text-2xl font-extrabold text-foreground">
-                {statsQuery.data?.[type] ?? 0}
-              </p>
-              <p className="mt-0.5 text-xs text-muted-foreground">{label}</p>
-            </article>
-          ))}
-        </div>
-      )}
-
-      <p className="rounded-xl bg-secondary p-3 text-xs text-muted-foreground">
-        Vues App et Vues Google se comptabilisent à chaque visite de votre fiche (Google = trafic
-        venu d'une recherche Google). Coupons Ouverts se comptabilise quand un client révèle votre
-        offre ; Coupons Validés quand vous confirmez son utilisation en caisse depuis l'onglet Promo
-        Flash.
-      </p>
+      <RoiStats commerceId={commerceId} />
 
       <ConversionStats
         commerceId={commerceId}
