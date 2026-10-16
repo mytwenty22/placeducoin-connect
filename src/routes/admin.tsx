@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { Session } from "@supabase/supabase-js";
 import { KeyRound, LogOut, ShieldCheck, UserPlus } from "lucide-react";
+import { AdminQuartiers } from "@/components/AdminQuartiers";
 import { AppHeader } from "@/components/AppHeader";
 import { EmailPasswordLogin } from "@/components/EmailPasswordLogin";
 import { supabase } from "@/lib/supabase";
@@ -177,7 +178,7 @@ function AdminDashboard({ userId }: { userId: string }) {
         </span>
         <div className="min-w-0 flex-1">
           <h1 className="truncate font-display text-2xl font-extrabold">Administration</h1>
-          <p className="text-sm text-primary-foreground/70">Création des comptes Mairie</p>
+          <p className="text-sm text-primary-foreground/70">Comptes et quartiers</p>
         </div>
         <button
           type="button"
@@ -260,6 +261,8 @@ function AdminDashboard({ userId }: { userId: string }) {
           ))}
         </div>
       </section>
+
+      <AdminQuartiers />
     </div>
   );
 }
