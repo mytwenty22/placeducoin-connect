@@ -365,7 +365,9 @@ function ProDashboard({ userId }: { userId: string }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("role, entity_type, siret, rna, immatriculation_en_cours, verification_status")
+        .select(
+          "role, entity_type, siret, rna, immatriculation_en_cours, verification_status, legal_name",
+        )
         .eq("id", userId)
         .maybeSingle();
       if (error) throw error;
@@ -409,6 +411,24 @@ function ProDashboard({ userId }: { userId: string }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileQuery.isSuccess, profileQuery.data]);
+
+  // Vérification automatique auprès de l'annuaire des entreprises dès qu'un identifiant est
+  // "à vérifier" (inscription, saisie dans le profil). Une seule tentative par identifiant et par
+  // visite : si l'annuaire est indisponible, le statut reste "à vérifier" et sera retenté plus tard.
+  const verifiedIdentifierRef = useRef<string | null>(null);
+  const pendingIdentifier =
+    profileQuery.data?.verification_status === "a_verifier"
+      ? (profileQuery.data.siret ?? profileQuery.data.rna)
+      : null;
+  useEffect(() => {
+    if (!pendingIdentifier || verifiedIdentifierRef.current === pendingIdentifier) return;
+    verifiedIdentifierRef.current = pendingIdentifier;
+    void supabase.functions.invoke("verify-identity").then(({ data }) => {
+      if (data?.status && data.status !== "a_verifier") {
+        void queryClient.invalidateQueries({ queryKey: ["profile", userId] });
+      }
+    });
+  }, [pendingIdentifier, queryClient, userId]);
 
   const commerceQuery = useQuery({
     queryKey: ["commerce", userId],
@@ -2613,6 +2633,9 @@ function OptionsScreen({
         <p className="flex items-center gap-2 rounded-xl bg-secondary px-3 py-2.5 text-xs text-muted-foreground">
           <CheckCircle2 className="h-4 w-4 shrink-0 text-navy" />
           {identifierLabel} — {VERIFICATION_LABELS[profile.verification_status]}
+          {profile.verification_status === "verifie" && profile.legal_name
+            ? ` (${profile.legal_name})`
+            : ""}
         </p>
       ) : null}
 

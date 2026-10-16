@@ -11,6 +11,8 @@ export type EntityIdentity = {
   rna: string | null;
   immatriculation_en_cours: boolean;
   verification_status: VerificationStatus;
+  /** Dénomination officielle renvoyée par l'annuaire des entreprises (verify-identity). */
+  legal_name: string | null;
 };
 
 /** Retire espaces, points et tirets ("123 456 789 00012" → "12345678900012"), met en majuscules. */
