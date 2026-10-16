@@ -358,13 +358,18 @@ function StandaloneSite() {
                             ) : null}
                           </div>
                         ) : null}
-                        <CouponButton commerceId={commerce.id} compact className="shrink-0" />
+                        {/* Sans position GPS du commerce, pas de validation sur place : on garde le
+                            coupon simple. */}
+                        {commerce.latitude == null || commerce.longitude == null ? (
+                          <CouponButton commerceId={commerce.id} compact className="shrink-0" />
+                        ) : null}
                       </div>
                       {commerce.latitude != null && commerce.longitude != null ? (
                         <ActivateOfferButton
                           promoId={p.id}
                           shopName={commerce.nom}
                           promoTitle={p.titre}
+                          commerceId={commerce.id}
                           compact
                           className="mt-2"
                         />

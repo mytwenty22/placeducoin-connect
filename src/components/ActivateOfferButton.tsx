@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Loader2, MapPin, ShoppingBag, X } from "lucide-react";
+import { BadgeCheck, CheckCircle2, Loader2, MapPin, Ticket, X } from "lucide-react";
 import { useSession } from "@/hooks/use-session";
 import { GeoPositionError, getCurrentPositionOnce, positionErrorMessage } from "@/lib/geo";
 import { supabase } from "@/lib/supabase";
+import { logStatEvent } from "@/lib/stats-tracking";
 
 // Au-delà, la précision annoncée par le GPS est trop faible pour prouver une présence dans un
 // rayon de 100 m (position "réseau" d'un ordinateur, GPS pas encore verrouillé en intérieur…).
@@ -29,6 +30,12 @@ function formatCountdown(totalSeconds: number) {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
+function formatTime(ms: number) {
+  return new Date(ms)
+    .toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
+    .replace(":", "h");
+}
+
 // Recalcule "maintenant" chaque seconde tant que `active`, pour piloter le compte à rebours.
 function useNow(active: boolean) {
   const [now, setNow] = useState(() => Date.now());
@@ -41,25 +48,59 @@ function useNow(active: boolean) {
   return now;
 }
 
+// Garde l'écran allumé pendant le compte à rebours : le commerçant doit pouvoir lire le badge
+// sans que le client touche au téléphone. Best-effort (API absente sur certains navigateurs).
+function useWakeLock(active: boolean) {
+  useEffect(() => {
+    if (!active || typeof navigator === "undefined" || !("wakeLock" in navigator)) return;
+    let lock: WakeLockSentinel | null = null;
+    let cancelled = false;
+    const request = () => {
+      navigator.wakeLock
+        .request("screen")
+        .then((sentinel) => {
+          if (cancelled) void sentinel.release();
+          else lock = sentinel;
+        })
+        .catch(() => {});
+    };
+    // Le verrou est libéré quand l'onglet passe en arrière-plan : on le redemande au retour.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") request();
+    };
+    request();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+      void lock?.release();
+    };
+  }, [active]);
+}
+
 function ConfirmationScreen({
   shopName,
   promoTitle,
+  validatedAt,
   secondsLeft,
   onClose,
 }: {
   shopName: string;
   promoTitle: string;
+  validatedAt: number | null;
   secondsLeft: number;
   onClose: () => void;
 }) {
-  const expired = secondsLeft <= 0;
+  const used = secondsLeft <= 0;
+  useWakeLock(!used);
+
   return (
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Offre activée"
+      aria-label={used ? "Coupon utilisé" : "Coupon validé"}
       className={`fixed inset-0 z-[60] flex flex-col items-center justify-center px-6 text-center text-white ${
-        expired ? "bg-slate-700" : "bg-emerald-600"
+        used ? "bg-slate-700" : "bg-emerald-600"
       }`}
     >
       <button
@@ -72,19 +113,38 @@ function ConfirmationScreen({
         <X className="h-5 w-5" />
       </button>
 
-      <CheckCircle2 className="h-20 w-20" aria-hidden />
-      <p className="mt-4 text-sm font-bold uppercase tracking-widest text-white/80">{shopName}</p>
-      <h2 className="mt-2 font-display text-3xl font-extrabold">
-        {expired ? "Offre expirée" : "Offre validée !"}
-      </h2>
-      <p className="mt-3 max-w-sm text-lg font-semibold leading-snug">{promoTitle}</p>
+      <p className="text-sm font-bold uppercase tracking-widest text-white/80">{shopName}</p>
+      <p className="mt-2 max-w-sm text-lg font-semibold leading-snug">{promoTitle}</p>
 
-      {expired ? (
-        <p className="mt-6 max-w-xs text-sm text-white/80">
-          Le délai de 10 minutes est écoulé. Cette offre ne peut plus être présentée en caisse.
-        </p>
+      {used ? (
+        <>
+          <span className="mt-8 inline-flex items-center gap-2 rounded-full bg-white/15 px-5 py-2.5 font-display text-2xl font-extrabold">
+            <CheckCircle2 className="h-7 w-7" aria-hidden /> Coupon utilisé
+          </span>
+          <p className="mt-6 max-w-xs text-sm text-white/80">
+            {validatedAt ? `Validé à ${formatTime(validatedAt)}. ` : ""}Ce coupon ne peut plus être
+            présenté en caisse.
+          </p>
+        </>
       ) : (
         <>
+          {/* Badge animé : un écran "vivant" se distingue d'une simple capture d'écran. */}
+          <span className="relative mt-8 inline-flex flex-col items-center rounded-3xl bg-white px-6 py-5 text-emerald-700 shadow-2xl">
+            <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
+              <span className="relative inline-flex h-4 w-4 rounded-full bg-emerald-300 ring-2 ring-white" />
+            </span>
+            <BadgeCheck className="h-14 w-14" aria-hidden />
+            <span className="mt-2 font-display text-3xl font-black leading-tight">
+              Coupon validé
+              <br />à l'instant
+            </span>
+            {validatedAt ? (
+              <span className="mt-1 text-sm font-semibold text-emerald-700/80">
+                à {formatTime(validatedAt)}
+              </span>
+            ) : null}
+          </span>
           <p
             className="mt-8 font-display text-6xl font-black tabular-nums"
             role="timer"
@@ -93,7 +153,7 @@ function ConfirmationScreen({
             {formatCountdown(secondsLeft)}
           </p>
           <p className="mt-3 max-w-xs text-sm text-white/85">
-            Présentez cet écran en caisse avant la fin du compte à rebours.
+            Montrez cet écran au commerçant. Passé ce délai, le coupon sera marqué comme utilisé.
           </p>
         </>
       )}
@@ -105,12 +165,14 @@ export function ActivateOfferButton({
   promoId,
   shopName,
   promoTitle,
+  commerceId,
   compact = false,
   className = "",
 }: {
   promoId: string;
   shopName: string;
   promoTitle: string;
+  commerceId?: string | undefined;
   compact?: boolean;
   className?: string;
 }) {
@@ -120,26 +182,32 @@ export function ActivateOfferButton({
   const [busy, setBusy] = useState<"locating" | "checking" | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [screenOpen, setScreenOpen] = useState(false);
+  // Étape "Valider / Annuler" : la validation est définitive, elle se fait devant le commerçant
+  // et pas par erreur depuis chez soi.
+  const [confirming, setConfirming] = useState(false);
 
   // Une activation déjà faite par ce client (même après un rechargement de page) : c'est elle qui
-  // dit s'il peut rouvrir l'écran vert (< 10 min) ou si l'offre est consommée.
+  // dit s'il peut rouvrir l'écran vert (< 5 min) ou si le coupon est utilisé.
   const activationQuery = useQuery({
     queryKey: ["promo-activation", promoId, userId],
     enabled: Boolean(userId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("promo_activations")
-        .select("expires_at")
+        .select("created_at, expires_at")
         .eq("promo_id", promoId)
         .eq("user_id", userId!)
         .maybeSingle();
       if (error) throw new Error(error.message);
-      return data as { expires_at: string } | null;
+      return data as { created_at: string; expires_at: string } | null;
     },
   });
 
   const expiresAt = activationQuery.data
     ? new Date(activationQuery.data.expires_at).getTime()
+    : null;
+  const validatedAt = activationQuery.data
+    ? new Date(activationQuery.data.created_at).getTime()
     : null;
   const now = useNow(expiresAt !== null);
   const secondsLeft = expiresAt === null ? 0 : Math.max(0, Math.ceil((expiresAt - now) / 1000));
@@ -149,18 +217,24 @@ export function ActivateOfferButton({
   const sizeClass = compact ? "px-3 py-1.5 text-xs" : "px-4 py-2.5 text-sm";
   const iconClass = compact ? "h-3.5 w-3.5" : "h-4 w-4";
 
-  async function handleClick() {
+  function handleStart() {
     setFeedback(null);
-
     if (!userId) {
-      setFeedback({ tone: "info", text: "Connectez-vous pour profiter de cette offre en caisse." });
+      setFeedback({ tone: "info", text: "Connectez-vous pour utiliser ce coupon sur place." });
       return;
     }
     if (isActive) {
       setScreenOpen(true);
       return;
     }
+    setConfirming(true);
+    // Remplace "Voir mon coupon" (masqué quand la validation sur place existe) dans la
+    // statistique "Coupons ouverts" de l'espace Pro.
+    void logStatEvent(commerceId, "coupon_open");
+  }
 
+  async function handleValidate() {
+    setFeedback(null);
     setBusy("locating");
     let position;
     try {
@@ -177,7 +251,7 @@ export function ActivateOfferButton({
       setBusy(null);
       setFeedback({
         tone: "error",
-        text: `Votre position est trop imprécise (± ${Math.round(position.accuracyM)} m) pour vérifier votre présence en boutique. Activez le GPS de votre téléphone et réessayez.`,
+        text: `Votre position est trop imprécise (± ${Math.round(position.accuracyM)} m) pour vérifier votre présence sur place. Activez le GPS de votre téléphone et réessayez.`,
       });
       return;
     }
@@ -193,7 +267,7 @@ export function ActivateOfferButton({
     if (error) {
       setFeedback({
         tone: "error",
-        text: "Impossible de valider l'offre pour le moment. Réessayez dans un instant.",
+        text: "Impossible de valider le coupon pour le moment. Réessayez dans un instant.",
       });
       return;
     }
@@ -202,33 +276,35 @@ export function ActivateOfferButton({
     switch (result.status) {
       case "activated":
       case "already_active":
+        setConfirming(false);
         await queryClient.invalidateQueries({ queryKey: ["promo-activation", promoId, userId] });
         setScreenOpen(true);
         return;
       case "already_used":
+        setConfirming(false);
         await queryClient.invalidateQueries({ queryKey: ["promo-activation", promoId, userId] });
-        setFeedback({ tone: "info", text: "Vous avez déjà profité de cette offre." });
+        setFeedback({ tone: "info", text: "Vous avez déjà utilisé ce coupon." });
         return;
       case "too_far":
         setFeedback({
           tone: "error",
-          text: `Vous devez être présent en boutique pour activer cette promo (vous êtes à environ ${formatDistance(result.distance_m)} du commerce).`,
+          text: `Vous devez être sur place pour valider ce coupon (vous êtes à environ ${formatDistance(result.distance_m)} du commerce).`,
         });
         return;
       case "own_commerce":
         setFeedback({
           tone: "info",
-          text: "Vous ne pouvez pas activer les offres de votre propre commerce.",
+          text: "Vous ne pouvez pas valider les coupons de votre propre commerce.",
         });
         return;
       case "no_location":
         setFeedback({
           tone: "error",
-          text: "Ce commerce n'a pas encore renseigné sa position : l'activation en caisse n'est pas disponible.",
+          text: "Ce commerce n'a pas encore renseigné sa position : la validation sur place n'est pas disponible.",
         });
         return;
       default:
-        setFeedback({ tone: "error", text: "Cette offre n'est plus disponible." });
+        setFeedback({ tone: "error", text: "Ce coupon n'est plus disponible." });
     }
   }
 
@@ -238,32 +314,60 @@ export function ActivateOfferButton({
   return (
     <div className={className}>
       {isUsed ? (
-        <p
+        <button
+          type="button"
+          onClick={() => setScreenOpen(true)}
           className={`inline-flex items-center gap-1.5 rounded-xl bg-secondary font-semibold text-muted-foreground ${sizeClass}`}
         >
-          <CheckCircle2 className={iconClass} /> Offre déjà utilisée
-        </p>
+          <CheckCircle2 className={iconClass} /> Coupon utilisé
+        </button>
+      ) : confirming ? (
+        <div className="rounded-2xl border border-emerald-600/30 bg-emerald-50 p-3 text-left text-emerald-950">
+          <p className="text-xs font-medium leading-snug">
+            À faire devant le commerçant : votre position est vérifiée, puis le badge « Coupon
+            validé » s'affiche 5 minutes. Le coupon est ensuite marqué comme utilisé.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => void handleValidate()}
+              className={`inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 font-bold text-white transition-colors hover:bg-emerald-700 disabled:opacity-70 ${sizeClass}`}
+            >
+              {busy ? (
+                <Loader2 className={`${iconClass} animate-spin`} />
+              ) : (
+                <BadgeCheck className={iconClass} />
+              )}
+              {busy === "locating"
+                ? "Localisation en cours…"
+                : busy === "checking"
+                  ? "Vérification…"
+                  : "Valider le coupon sur place"}
+            </button>
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => {
+                setConfirming(false);
+                setFeedback(null);
+              }}
+              className={`inline-flex items-center justify-center rounded-xl bg-white font-semibold text-foreground ring-1 ring-border hover:bg-secondary disabled:opacity-70 ${sizeClass}`}
+            >
+              Annuler
+            </button>
+          </div>
+        </div>
       ) : (
         <button
           type="button"
-          disabled={busy !== null}
-          onClick={() => void handleClick()}
-          className={`inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 font-bold text-white transition-colors hover:bg-emerald-700 disabled:opacity-70 ${sizeClass}`}
+          onClick={handleStart}
+          className={`inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 font-bold text-white transition-colors hover:bg-emerald-700 ${sizeClass}`}
         >
-          {busy ? (
-            <Loader2 className={`${iconClass} animate-spin`} />
-          ) : isActive ? (
-            <CheckCircle2 className={iconClass} />
-          ) : (
-            <ShoppingBag className={iconClass} />
-          )}
-          {busy === "locating"
-            ? "Localisation en cours…"
-            : busy === "checking"
-              ? "Vérification…"
-              : isActive
-                ? `Voir mon écran de validation (${formatCountdown(secondsLeft)})`
-                : "Profiter de cette offre en caisse"}
+          {isActive ? <BadgeCheck className={iconClass} /> : <Ticket className={iconClass} />}
+          {isActive
+            ? `Coupon validé — afficher (${formatCountdown(secondsLeft)})`
+            : "Utiliser ce coupon sur place"}
         </button>
       )}
 
@@ -299,6 +403,7 @@ export function ActivateOfferButton({
         <ConfirmationScreen
           shopName={shopName}
           promoTitle={promoTitle}
+          validatedAt={validatedAt}
           secondsLeft={secondsLeft}
           onClose={() => setScreenOpen(false)}
         />

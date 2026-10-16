@@ -214,14 +214,17 @@ function ShopSite() {
             </div>
             {offer.kind !== "evenement" && offer.promoId ? (
               <div className="flex flex-col items-start gap-3 px-5 py-4">
+                {/* Sans position GPS du commerce, pas de validation sur place : coupon simple. */}
                 {offer.hasLocation ? (
                   <ActivateOfferButton
                     promoId={offer.promoId}
                     shopName={offer.shop}
                     promoTitle={offer.title}
+                    commerceId={offer.commerceId}
                   />
-                ) : null}
-                <CouponButton commerceId={offer.commerceId} />
+                ) : (
+                  <CouponButton commerceId={offer.commerceId} />
+                )}
               </div>
             ) : null}
           </section>

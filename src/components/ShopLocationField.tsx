@@ -121,8 +121,8 @@ export function ShopLocationField({
           )}
         </p>
         <p className="mt-1.5 text-xs text-muted-foreground">
-          Nécessaire au bouton « Profiter de cette offre en caisse » : vos clients doivent se
-          trouver à moins de 100 m de ce point pour activer une promo.
+          Nécessaire au bouton « Utiliser ce coupon sur place » : vos clients doivent se trouver à
+          moins de 100 m de ce point pour activer une promo.
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <button

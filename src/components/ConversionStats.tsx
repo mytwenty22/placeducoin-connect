@@ -87,7 +87,7 @@ export function ConversionStats({
         <div className="flex items-start gap-2 rounded-xl border border-promo/40 bg-promo/5 p-3 text-xs text-foreground">
           <MapPinOff className="mt-0.5 h-4 w-4 shrink-0 text-promo" />
           <p>
-            Le bouton « Profiter de cette offre en caisse » est masqué sur votre fiche tant que la
+            Le bouton « Utiliser ce coupon sur place » est masqué sur votre fiche tant que la
             position GPS de votre boutique n'est pas renseignée.{" "}
             <button type="button" onClick={onGoToProfile} className="font-bold text-navy underline">
               Renseigner ma position
