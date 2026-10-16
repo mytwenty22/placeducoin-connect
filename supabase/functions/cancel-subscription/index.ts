@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
 
     const { data: commerce, error: commerceError } = await userClient
       .from("commerces")
-      .select("id, stripe_subscription_id")
+      .select("id")
       .eq("owner_id", user.id)
       .maybeSingle();
     if (commerceError) throw commerceError;
@@ -43,16 +43,30 @@ Deno.serve(async (req) => {
     // Un abonnement réellement payé via Stripe doit être annulé côté Stripe (sinon la facturation
     // continue même si le flag est désactivé côté site) ; un abonnement activé gratuitement en
     // mode démo n'a pas de stripe_subscription_id, on se contente alors du flag.
-    if (commerce.stripe_subscription_id) {
-      await stripe.subscriptions.cancel(commerce.stripe_subscription_id);
+    // Identifiants Stripe : table privée commerce_billing (service_role uniquement).
+    const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const { data: billing, error: billingError } = await adminClient
+      .from("commerce_billing")
+      .select("stripe_subscription_id")
+      .eq("commerce_id", commerce.id)
+      .maybeSingle();
+    if (billingError) throw billingError;
+    if (billing?.stripe_subscription_id) {
+      await stripe.subscriptions.cancel(billing.stripe_subscription_id);
     }
 
-    const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const { error: updateError } = await adminClient
       .from("commerces")
-      .update({ site_actif: false, stripe_subscription_id: null })
+      .update({ site_actif: false })
       .eq("id", commerce.id);
     if (updateError) throw updateError;
+    if (billing) {
+      const { error: billingUpdateError } = await adminClient
+        .from("commerce_billing")
+        .update({ stripe_subscription_id: null, updated_at: new Date().toISOString() })
+        .eq("commerce_id", commerce.id);
+      if (billingUpdateError) throw billingUpdateError;
+    }
 
     return new Response(JSON.stringify({ ok: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

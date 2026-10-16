@@ -90,7 +90,7 @@ Deno.serve(async (req) => {
     const { data: commerce, error: commerceError } = await userClient
       .from("commerces")
       .select(
-        "id, slug, nom, ville_id, logo_url, photo_url, site_actif, boost_actif, boost_expires_at, stripe_customer_id",
+        "id, slug, nom, ville_id, logo_url, photo_url, site_actif, boost_actif, boost_expires_at",
       )
       .eq("owner_id", user.id)
       .maybeSingle();
@@ -201,18 +201,26 @@ Deno.serve(async (req) => {
       });
     }
 
-    let customerId = commerce.stripe_customer_id ?? undefined;
+    // Client Stripe : table privée commerce_billing (service_role uniquement).
+    const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const { data: billing, error: billingError } = await adminClient
+      .from("commerce_billing")
+      .select("stripe_customer_id")
+      .eq("commerce_id", commerce.id)
+      .maybeSingle();
+    if (billingError) throw billingError;
+    let customerId = billing?.stripe_customer_id ?? undefined;
     if (!customerId && user.email) {
       const customer = await stripe.customers.create({
         email: user.email,
         metadata: { commerce_id: commerce.id },
       });
       customerId = customer.id;
-      const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-      await adminClient
-        .from("commerces")
-        .update({ stripe_customer_id: customerId })
-        .eq("id", commerce.id);
+      await adminClient.from("commerce_billing").upsert({
+        commerce_id: commerce.id,
+        stripe_customer_id: customerId,
+        updated_at: new Date().toISOString(),
+      });
     }
 
     const session = await stripe.checkout.sessions.create({

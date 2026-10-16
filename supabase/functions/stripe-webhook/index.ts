@@ -17,14 +17,14 @@ async function activateFromSession(session: Stripe.Checkout.Session) {
   if (!commerceId) return;
 
   if (metadata.type === "site_pro") {
-    await admin
-      .from("commerces")
-      .update({
-        site_actif: true,
-        stripe_customer_id: (session.customer as string) ?? null,
-        stripe_subscription_id: (session.subscription as string) ?? null,
-      })
-      .eq("id", commerceId);
+    await admin.from("commerces").update({ site_actif: true }).eq("id", commerceId);
+    // Identifiants Stripe : table privée commerce_billing, jamais dans commerces (lecture publique).
+    await admin.from("commerce_billing").upsert({
+      commerce_id: commerceId,
+      stripe_customer_id: (session.customer as string) ?? null,
+      stripe_subscription_id: (session.subscription as string) ?? null,
+      updated_at: new Date().toISOString(),
+    });
     return;
   }
 
@@ -72,10 +72,17 @@ async function activateFromSession(session: Stripe.Checkout.Session) {
 }
 
 async function deactivateSubscription(subscription: Stripe.Subscription) {
-  await admin
-    .from("commerces")
-    .update({ site_actif: false, stripe_subscription_id: null })
+  const { data: billing } = await admin
+    .from("commerce_billing")
+    .select("commerce_id")
     .eq("stripe_subscription_id", subscription.id);
+  const commerceIds = (billing ?? []).map((b) => b.commerce_id as string);
+  if (commerceIds.length === 0) return;
+  await admin.from("commerces").update({ site_actif: false }).in("id", commerceIds);
+  await admin
+    .from("commerce_billing")
+    .update({ stripe_subscription_id: null, updated_at: new Date().toISOString() })
+    .in("commerce_id", commerceIds);
 }
 
 Deno.serve(async (req) => {
