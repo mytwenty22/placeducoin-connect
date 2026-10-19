@@ -1601,10 +1601,39 @@ function PromoScreen({
   ).length;
   const limitReached = !isEvent && activePromoCount >= MAX_ACTIVE_PROMOS;
 
+  // Code PIN de validation en caisse : un seul code par commerce (valable pour toutes ses offres),
+  // le même que celui de l'onglet Stats. Prérempli avec le code actuel, enregistré à la
+  // publication s'il a été modifié.
+  const pinQuery = useQuery({
+    queryKey: ["commerce-pin", commerceId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_commerce_pin", {
+        p_commerce_id: commerceId,
+      });
+      if (error) throw new Error(error.message);
+      return data as string;
+    },
+  });
+  const [pinDraft, setPinDraft] = useState<string | null>(null);
+  const pinValue = pinDraft ?? pinQuery.data ?? "";
+  const pinChanged = pinQuery.data !== undefined && pinValue !== pinQuery.data;
+
   const publishMutation = useMutation({
     mutationFn: async () => {
       if (isEvent && !eventDateTime) {
         throw new Error("Date et heure requises pour un événement.");
+      }
+      if (!isEvent && pinChanged) {
+        if (!/^\d{4}$/.test(pinValue)) {
+          throw new Error("Le code PIN de validation doit comporter exactement 4 chiffres.");
+        }
+        const { error: pinError } = await supabase.rpc("set_commerce_pin", {
+          p_commerce_id: commerceId,
+          p_pin: pinValue,
+        });
+        if (pinError) throw new Error("Impossible d'enregistrer le code PIN. Réessayez.");
+        setPinDraft(null);
+        await queryClient.invalidateQueries({ queryKey: ["commerce-pin", commerceId] });
       }
       if (!isEvent) {
         const { count, error: countError } = await supabase
@@ -1832,6 +1861,34 @@ function PromoScreen({
                 </select>
               </label>
             </div>
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Code PIN de validation en caisse
+              </span>
+              <input
+                inputMode="numeric"
+                autoComplete="off"
+                maxLength={4}
+                value={pinValue}
+                onChange={(e) => setPinDraft(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                placeholder={pinQuery.isLoading ? "…" : "1234"}
+                disabled={pinQuery.isLoading || pinQuery.isError}
+                className="mt-1 w-32 rounded-xl border border-input bg-card px-3 py-2.5 text-center font-mono text-base tracking-[0.4em] text-foreground outline-none focus:border-navy disabled:opacity-60"
+              />
+              <span className="mt-1 block text-xs text-muted-foreground">
+                Ce code permettra de valider le coupon en caisse si la géolocalisation du client
+                échoue.
+                {pinQuery.data === "1234" && !pinChanged
+                  ? " Vous utilisez le code par défaut (1234) : choisissez-en un personnel."
+                  : ""}
+                {pinChanged ? " Le nouveau code sera enregistré à la publication." : ""}
+              </span>
+              {pinQuery.isError ? (
+                <span className="mt-1 block text-xs text-red-600">
+                  Impossible de charger le code PIN.
+                </span>
+              ) : null}
+            </label>
             <p className="rounded-xl bg-secondary p-3 text-xs text-muted-foreground">
               {boosted
                 ? "Votre offre est actuellement affichée en haut de la marketplace (badge En Vedette)."
