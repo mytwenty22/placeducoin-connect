@@ -417,3 +417,12 @@ enabled = true
 # declarative_schema_path = "./schemas"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+[functions.send-promo-alerts]
+# Doit rester à true : la fonction accepte tout JWT de rôle service_role (voir
+# _shared/service-auth.ts) en s'appuyant sur la vérification de signature faite par la passerelle.
+verify_jwt = true
+
+[functions.send-mairie-alerts]
+# Même règle que send-promo-alerts (voir _shared/service-auth.ts).
+verify_jwt = true

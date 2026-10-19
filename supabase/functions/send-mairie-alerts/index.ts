@@ -2,6 +2,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { sendAlertEmail } from "../_shared/resend.ts";
 import { sendPushToVille } from "../_shared/web-push.ts";
+import { isServiceRoleRequest } from "../_shared/service-auth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -21,9 +22,7 @@ Deno.serve(async (req) => {
     // Appelée uniquement par le trigger Postgres mairie_alert_trigger (voir migration
     // 20260922140000_reliable_alert_triggers.sql), authentifié avec la clé service_role stockée
     // dans Vault -- jamais directement par le client.
-    const authHeader = req.headers.get("Authorization") ?? "";
-    if (authHeader !== `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`)
-      return jsonError("Non autorisé.", 401);
+    if (!isServiceRoleRequest(req)) return jsonError("Non autorisé.", 401);
 
     const { infoId } = await req.json();
     console.log("send-mairie-alerts: reçu infoId =", infoId);

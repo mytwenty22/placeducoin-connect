@@ -2,6 +2,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { sendAlertEmail } from "../_shared/resend.ts";
 import { sendPushToFavorites, sendPushToVille } from "../_shared/web-push.ts";
+import { isServiceRoleRequest } from "../_shared/service-auth.ts";
 
 // Seuil "Promo Flash" : 4 h, + 5 min de tolérance d'horloge.
 const FLASH_MAX_MS = (4 * 60 + 5) * 60 * 1000;
@@ -25,9 +26,7 @@ Deno.serve(async (req) => {
     // 20260922140000_reliable_alert_triggers.sql), authentifié avec la clé service_role stockée
     // dans Vault -- jamais directement par le client, donc pas de vérification de propriétaire ici :
     // le trigger ne se déclenche que sur une ligne déjà insérée avec succès (RLS déjà appliquée).
-    const authHeader = req.headers.get("Authorization") ?? "";
-    if (authHeader !== `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`)
-      return jsonError("Non autorisé.", 401);
+    if (!isServiceRoleRequest(req)) return jsonError("Non autorisé.", 401);
 
     const { promoId } = await req.json();
     console.log("send-promo-alerts: reçu promoId =", promoId);
