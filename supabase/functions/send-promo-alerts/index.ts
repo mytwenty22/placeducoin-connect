@@ -1,7 +1,10 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { sendAlertEmail } from "../_shared/resend.ts";
-import { sendPushToVille } from "../_shared/web-push.ts";
+import { sendPushToFavorites, sendPushToVille } from "../_shared/web-push.ts";
+
+// Seuil "Promo Flash" : 4 h, + 5 min de tolérance d'horloge.
+const FLASH_MAX_MS = (4 * 60 + 5) * 60 * 1000;
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -34,7 +37,9 @@ Deno.serve(async (req) => {
 
     const { data: promo, error: promoError } = await adminClient
       .from("promos")
-      .select("id, titre, commerce_id, commerces(nom, slug, category, ville_id)")
+      .select(
+        "id, titre, kind, created_at, valide_jusqu_a, commerce_id, commerces(nom, slug, category, ville_id, site_actif)",
+      )
       .eq("id", promoId)
       .maybeSingle();
     if (promoError) throw promoError;
@@ -75,13 +80,44 @@ Deno.serve(async (req) => {
     const sent = results.filter((r) => r.ok).length;
     console.log("send-promo-alerts: résultats =", JSON.stringify(results));
 
-    // Notifications push "bons plans du quartier" (navigateurs abonnés pour cette commune).
-    const push = await sendPushToVille(adminClient, commerce.ville_id, commerce.category, {
-      title: `Nouvelle offre chez ${commerce.nom}`,
-      body: promo.titre,
-      url: `/commerce/${commerce.slug}`,
-      tag: `promo-${promo.id}`,
+    // Promo Flash : promo ou arrivage publié pour 4 h ou moins (durées 2 h / 4 h du formulaire Pro ;
+    // petite marge pour l'écart entre l'heure du navigateur du commerçant et celle du serveur).
+    const durationMs =
+      new Date(promo.valide_jusqu_a).getTime() - new Date(promo.created_at).getTime();
+    const isFlash = promo.kind !== "evenement" && durationMs <= FLASH_MAX_MS;
+    // Lien direct vers l'offre (pré-sélectionnée sur la fiche, voir validateOfferSearch).
+    const offerUrl = `${commerce.site_actif ? "/site" : "/commerce"}/${commerce.slug}?offre=${promo.id}`;
+    const endsAt = new Date(promo.valide_jusqu_a).toLocaleTimeString("fr-FR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Europe/Paris",
     });
+
+    // 1) Promos Flash -> clients qui ont ce commerce en favori et ont activé ces notifications,
+    //    quelle que soit leur commune.
+    const favoritesPush = isFlash
+      ? await sendPushToFavorites(adminClient, promo.commerce_id, {
+          title: `⚡ ${commerce.nom} vient de publier une offre flash !`,
+          body: `${promo.titre} — jusqu'à ${endsAt.replace(":", "h")}`,
+          url: offerUrl,
+          tag: `promo-${promo.id}`,
+        })
+      : { sent: 0, failed: 0, subscriptionIds: [] };
+
+    // 2) Notifications push "bons plans du quartier" (navigateurs abonnés pour cette commune),
+    //    sauf ceux déjà prévenus par la Promo Flash ci-dessus.
+    const push = await sendPushToVille(
+      adminClient,
+      commerce.ville_id,
+      commerce.category,
+      {
+        title: `Nouvelle offre chez ${commerce.nom}`,
+        body: promo.titre,
+        url: offerUrl,
+        tag: `promo-${promo.id}`,
+      },
+      favoritesPush.subscriptionIds,
+    );
 
     // Notification en base pour les clients connectés qui ont ce commerce en favori -- visible dans
     // l'écran Notifications de l'app même s'ils ne naviguent pas dessus au moment de la publication.
@@ -96,7 +132,9 @@ Deno.serve(async (req) => {
       const { error: notifError } = await adminClient.from("notifications").insert(
         favUsers.map((f) => ({
           user_id: f.user_id,
-          title: `Nouvelle offre chez ${commerce.nom}`,
+          title: isFlash
+            ? `⚡ ${commerce.nom} vient de publier une offre flash !`
+            : `Nouvelle offre chez ${commerce.nom}`,
           body: promo.titre,
           commerce_slug: commerce.slug,
         })),
@@ -104,7 +142,7 @@ Deno.serve(async (req) => {
       if (notifError) console.error("send-promo-alerts: échec insertion notifications", notifError);
     }
 
-    return new Response(JSON.stringify({ sent, push, results }), {
+    return new Response(JSON.stringify({ sent, push, favoritesPush, isFlash, results }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {

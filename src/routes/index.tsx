@@ -8,7 +8,7 @@ import { useSelectedVille } from "@/hooks/use-villes";
 import { SponsorBanner } from "@/components/SponsorBanner";
 import { BottomSponsorBanner } from "@/components/BottomSponsorBanner";
 import { InstallAppBanner } from "@/components/InstallAppBanner";
-import { PushOptInCard } from "@/components/PushOptIn";
+import { FavoritesPushCard, PushOptInCard } from "@/components/PushOptIn";
 import { CommerceMap, type MapBounds } from "@/components/CommerceMap";
 import { fetchCommuneCenter } from "@/lib/map-geocode";
 import { OfferCard } from "@/components/OfferCard";
@@ -588,6 +588,11 @@ function Marketplace() {
 
       {/* Bannière sponsorisée par commune : bannière-modèle tant qu'aucune vraie pub n'est configurée */}
       <SponsorBanner banner={bannerQuery.data} />
+
+      {/* Invitation discrète aux Promos Flash des favoris (comptes avec au moins un favori). */}
+      <div className="mx-auto max-w-6xl px-4 pt-4 empty:hidden">
+        <FavoritesPushCard />
+      </div>
 
       {/* Espace VIP "À la une" : Site Pro + Vedette 24h cumulés, juste sous la bannière */}
       {!isSearching && vip.length > 0 ? (

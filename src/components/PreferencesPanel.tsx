@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Settings, MailCheck } from "lucide-react";
-import { PushSettings } from "@/components/PushOptIn";
+import { FavoritesPushSettings, PushSettings } from "@/components/PushOptIn";
 import {
   Sheet,
   SheetContent,
@@ -189,6 +189,10 @@ export function PreferencesPanel() {
 
         <div className="mt-6 border-t border-border pt-4">
           <PushSettings />
+        </div>
+
+        <div className="mt-4 border-t border-border pt-4">
+          <FavoritesPushSettings />
         </div>
       </SheetContent>
     </Sheet>

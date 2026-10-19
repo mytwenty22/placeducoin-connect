@@ -1,15 +1,19 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { BellRing, Loader2, X } from "lucide-react";
+import { BellRing, Loader2, X, Zap } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/lib/supabase";
 import { CATEGORIES } from "@/lib/placeducoin-data";
 import { useUserPrefs } from "@/lib/user-prefs";
+import { useSession } from "@/hooks/use-session";
+import { useFavoriteIds } from "@/hooks/use-favorites";
 import {
+  disableFavoritesPush,
   disablePush,
+  enableFavoritesPush,
   enablePush,
-  getCurrentPushSubscription,
+  getPushSubscriptionState,
   getPushSupport,
   getSavedPushVille,
   type PushSupport,
@@ -17,16 +21,19 @@ import {
 
 const CARD_DISMISSED_KEY = "spotlocal:push-card-dismissed";
 
-type PushState = { support: PushSupport; enabled: boolean; denied: boolean };
+// `enabled` : alertes de commune actives ; `favorites` : Promos Flash des favoris actives. Un même
+// navigateur peut avoir l'une, l'autre ou les deux (un seul abonnement push côté navigateur).
+type PushState = { support: PushSupport; enabled: boolean; favorites: boolean; denied: boolean };
 
 function usePushState() {
   const [state, setState] = useState<PushState | null>(null);
   const refresh = async () => {
     const support = getPushSupport();
-    const subscription = support === "supported" ? await getCurrentPushSubscription() : null;
+    const subscription = support === "supported" ? await getPushSubscriptionState() : null;
     setState({
       support,
-      enabled: subscription !== null,
+      enabled: subscription?.ville ?? false,
+      favorites: subscription?.favorites ?? false,
       denied: support === "supported" && Notification.permission === "denied",
     });
   };
@@ -219,6 +226,139 @@ export function PushOptInCard({ villeId, villeNom }: { villeId: string; villeNom
         aria-label="Fermer"
         onClick={dismiss}
         className="shrink-0 rounded-full p-1.5 text-muted-foreground hover:bg-secondary"
+      >
+        <X className="h-4 w-4" />
+      </button>
+    </aside>
+  );
+}
+
+const FAVORITES_CARD_DISMISSED_KEY = "spotlocal:favorites-push-card-dismissed";
+
+function useFavoritesPushToggle(refresh: () => Promise<void>) {
+  const [busy, setBusy] = useState(false);
+  async function toggle(next: boolean) {
+    setBusy(true);
+    try {
+      if (next) await enableFavoritesPush();
+      else await disableFavoritesPush();
+      toast.success(
+        next
+          ? "Vous serez prévenu des Promos Flash de vos commerces favoris."
+          : "Promos Flash des favoris coupées.",
+      );
+    } catch (error) {
+      toast.error((error as Error).message);
+    } finally {
+      setBusy(false);
+      await refresh();
+    }
+  }
+  return { busy, toggle };
+}
+
+/**
+ * Réglage "Promos Flash de mes favoris" du panneau Préférences : réservé aux comptes connectés,
+ * puisque ce sont leurs favoris qui déclenchent l'envoi.
+ */
+export function FavoritesPushSettings() {
+  const { session, ready } = useSession();
+  const { state, refresh } = usePushState();
+  const { busy, toggle } = useFavoritesPushToggle(refresh);
+  const signedIn = Boolean(session);
+
+  return (
+    <div className="flex items-start gap-3">
+      <div className="min-w-0 flex-1">
+        <h3 className="text-sm font-semibold text-foreground">Promos Flash de mes favoris</h3>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {!ready || !state
+            ? "…"
+            : !signedIn
+              ? "Connectez-vous pour être prévenu des offres flash de vos commerces favoris."
+              : state.support !== "supported" || state.denied
+                ? "Indisponible sur ce navigateur (voir ci-dessus)."
+                : "Une notification dès qu'un de vos commerces favoris publie une offre flash (4 h ou moins)."}
+        </p>
+      </div>
+      {busy ? (
+        <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin text-muted-foreground" />
+      ) : null}
+      <Switch
+        checked={state?.favorites ?? false}
+        disabled={!signedIn || !state || state.support !== "supported" || state.denied || busy}
+        onCheckedChange={(checked) => void toggle(checked)}
+        aria-label="Promos Flash de mes favoris"
+        className="mt-0.5"
+      />
+    </div>
+  );
+}
+
+/**
+ * Invitation discrète de la Marketplace : proposée aux comptes connectés qui ont au moins un
+ * commerce en favori, tant que les Promos Flash des favoris ne sont pas activées sur ce
+ * navigateur. Fermée une fois, elle ne revient plus (le réglage reste dans les Préférences).
+ */
+export function FavoritesPushCard() {
+  const { session } = useSession();
+  const userId = session?.user.id;
+  const favoritesQuery = useFavoriteIds(userId);
+  const { state, refresh } = usePushState();
+  const { busy, toggle } = useFavoritesPushToggle(refresh);
+  const [hidden, setHidden] = useState(true);
+
+  useEffect(() => {
+    try {
+      setHidden(window.localStorage.getItem(FAVORITES_CARD_DISMISSED_KEY) === "1");
+    } catch {
+      setHidden(false);
+    }
+  }, []);
+
+  const favoriteCount = favoritesQuery.data?.length ?? 0;
+  if (
+    hidden ||
+    !userId ||
+    favoriteCount === 0 ||
+    !state ||
+    state.favorites ||
+    state.denied ||
+    state.support !== "supported"
+  ) {
+    return null;
+  }
+
+  function dismiss() {
+    setHidden(true);
+    try {
+      window.localStorage.setItem(FAVORITES_CARD_DISMISSED_KEY, "1");
+    } catch {
+      // Sans stockage, la carte réapparaîtra à la prochaine visite.
+    }
+  }
+
+  return (
+    <aside className="flex items-center gap-3 rounded-2xl border border-promo/30 bg-promo/5 px-3 py-2.5">
+      <Zap className="h-4 w-4 shrink-0 text-promo" aria-hidden />
+      <p className="min-w-0 flex-1 text-xs text-foreground">
+        <span className="font-bold">Promos Flash</span> : soyez prévenu dès qu'un de vos{" "}
+        {favoriteCount > 1 ? `${favoriteCount} commerces favoris` : "commerces favoris"} publie une
+        offre flash.
+      </p>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => void toggle(true)}
+        className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-promo px-3 py-1.5 text-xs font-bold text-promo-foreground hover:opacity-90 disabled:opacity-60"
+      >
+        {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null} Activer
+      </button>
+      <button
+        type="button"
+        aria-label="Fermer"
+        onClick={dismiss}
+        className="shrink-0 rounded-full p-1 text-muted-foreground hover:bg-secondary"
       >
         <X className="h-4 w-4" />
       </button>
