@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Search, MapPin, ChevronDown, Megaphone, Building2, Map as MapIcon } from "lucide-react";
+import { Search, MapPin, Megaphone, Building2, Map as MapIcon } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
+import { CitySelect } from "@/components/CitySelect";
+import { useSelectedVille } from "@/hooks/use-villes";
 import { SponsorBanner } from "@/components/SponsorBanner";
 import { BottomSponsorBanner } from "@/components/BottomSponsorBanner";
 import { InstallAppBanner } from "@/components/InstallAppBanner";
@@ -52,13 +54,6 @@ export const Route = createFileRoute("/")({
   component: Marketplace,
 });
 
-type Ville = {
-  id: string;
-  nom: string;
-  slug: string;
-  codes_postaux: string[];
-  insee_code: string | null;
-};
 type Quartier = { id: string; nom: string; code_postal: string; ville_id: string };
 
 // Valeur de l'option "Tous les quartiers" (Radix Select n'accepte pas de valeur vide).
@@ -70,34 +65,6 @@ const MAP_PREF_KEY = "spotlocal:home-map";
 // consultant une autre commune que la sienne : le filtre par rayon ne s'applique plus.
 const IN_CITY_MAX_KM = 5;
 
-// Ville et quartier choisis par le visiteur, mémorisés sur l'appareil : en revenant d'une fiche
-// (bouton Retour, logo, onglet Marketplace…) l'accueil se rouvre sur la même commune au lieu de
-// retomber sur la commune par défaut.
-const VILLE_PREF_KEY = "spotlocal:home-ville";
-type StoredVille = { villeId: string; quartierId: string | null };
-
-function readStoredVille(): StoredVille | null {
-  try {
-    const raw = window.localStorage.getItem(VILLE_PREF_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<StoredVille>;
-    if (typeof parsed.villeId !== "string") return null;
-    return {
-      villeId: parsed.villeId,
-      quartierId: typeof parsed.quartierId === "string" ? parsed.quartierId : null,
-    };
-  } catch {
-    return null;
-  }
-}
-
-function writeStoredVille(value: StoredVille) {
-  try {
-    window.localStorage.setItem(VILLE_PREF_KEY, JSON.stringify(value));
-  } catch {
-    // Stockage indisponible : la ville ne sera pas mémorisée.
-  }
-}
 type PublicNotice = {
   id: string;
   titre: string;
@@ -238,40 +205,17 @@ function matchesSearch(commerce: CommerceListing, normalizedQuery: string): bool
 }
 
 function Marketplace() {
-  const [selectedVille, setSelectedVille] = useState<Ville | null>(null);
-  // Le quartier choisi est mémorisé AVEC sa ville : dès que la ville change (liste, code postal,
-  // ville par défaut…), le filtre retombe de lui-même sur "Tout <ville>", sans état résiduel.
-  const [quartierSelection, setQuartierSelection] = useState<{
-    villeId: string;
-    quartierId: string;
-  } | null>(null);
-  const selectedQuartierId =
-    quartierSelection && quartierSelection.villeId === selectedVille?.id
-      ? quartierSelection.quartierId
-      : null;
-  const setSelectedQuartierId = (quartierId: string | null) =>
-    setQuartierSelection(
-      quartierId && selectedVille ? { villeId: selectedVille.id, quartierId } : null,
-    );
-  const [cityQuery, setCityQuery] = useState("");
-  const [cityOpen, setCityOpen] = useState(false);
-  const cityMenuRef = useRef<HTMLDivElement>(null);
-  // Le menu des communes se referme au clic à l'extérieur ou avec Échap.
-  useEffect(() => {
-    if (!cityOpen) return;
-    const onPointerDown = (e: PointerEvent) => {
-      if (!cityMenuRef.current?.contains(e.target as Node)) setCityOpen(false);
-    };
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setCityOpen(false);
-    };
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [cityOpen]);
+  // Ville affichée : dernier choix explicite (Marketplace ou Espace Pro), sinon la ville du
+  // commerce connecté, sinon la commune la plus fournie -- voir useSelectedVille. Le quartier est
+  // mémorisé AVEC sa ville : changer de ville remet le filtre sur "Tout <ville>".
+  const {
+    villes,
+    villesLoading,
+    ville: selectedVille,
+    quartierId: selectedQuartierId,
+    selectVille,
+    selectQuartier: setSelectedQuartierId,
+  } = useSelectedVille();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<CategoryKey | null>(null);
   // Carte affichée d'office sur grand écran, repliée sur mobile (la liste reste visible sous les
@@ -298,63 +242,6 @@ function Marketplace() {
   };
   const { radiusKm, favoriteCategories, position } = useUserPrefs();
   const hasPosition = position !== null;
-
-  const villesQuery = useQuery({
-    queryKey: ["villes"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("villes")
-        .select("id, nom, slug, codes_postaux, insee_code, commerces(count)")
-        .order("nom");
-      if (error) throw error;
-      return (data as unknown as (Ville & { commerces: { count: number }[] })[]).map(
-        ({ commerces, ...v }) => ({ ...v, commerceCount: commerces[0]?.count ?? 0 }),
-      );
-    },
-  });
-
-  // Ville initiale : celle mémorisée sur l'appareil (avec son quartier) si elle existe toujours ;
-  // sinon -- les villes étant créées à la volée par les Pros (ensure-ville) -- la commune la plus
-  // fournie plutôt que la première par ordre alphabétique.
-  useEffect(() => {
-    if (selectedVille) return;
-    const villes = villesQuery.data ?? [];
-    const stored = readStoredVille();
-    const remembered = stored ? villes.find((v) => v.id === stored.villeId) : undefined;
-    if (remembered) {
-      setSelectedVille(remembered);
-      if (stored?.quartierId) {
-        setQuartierSelection({ villeId: remembered.id, quartierId: stored.quartierId });
-      }
-      return;
-    }
-    const busiest = villes.reduce<(typeof villes)[number] | undefined>(
-      (best, v) => (!best || v.commerceCount > best.commerceCount ? v : best),
-      undefined,
-    );
-    if (busiest) setSelectedVille(busiest);
-  }, [selectedVille, villesQuery.data]);
-
-  useEffect(() => {
-    if (!selectedVille) return;
-    writeStoredVille({ villeId: selectedVille.id, quartierId: selectedQuartierId });
-  }, [selectedVille, selectedQuartierId]);
-
-  const citySuggestions = useMemo(
-    () =>
-      (villesQuery.data ?? [])
-        // Recherche par nom de commune ou par code postal (33000, 336…).
-        .filter((v) => {
-          const q = cityQuery.trim().toLowerCase();
-          return (
-            v.nom.toLowerCase().includes(q) ||
-            (/^\d+$/.test(q) && v.codes_postaux.some((cp) => cp.startsWith(q)))
-          );
-        }),
-    // Toutes les communes sont listées (liste défilante) : chacun peut passer librement de l'une
-    // à l'autre, sans avoir à connaître le nom exact pour la faire apparaître.
-    [villesQuery.data, cityQuery],
-  );
 
   const city = selectedVille?.nom ?? "";
 
@@ -547,56 +434,12 @@ function Marketplace() {
           </div>
 
           <div className="mt-4 grid gap-3 sm:mt-5 sm:grid-cols-[minmax(0,260px)_minmax(0,1fr)]">
-            <div ref={cityMenuRef} className="relative">
-              <button
-                type="button"
-                aria-expanded={cityOpen}
-                onClick={() => setCityOpen((v) => !v)}
-                className="flex w-full items-center gap-2 rounded-xl bg-card px-3 py-3 text-left text-sm font-semibold text-foreground shadow-card"
-              >
-                <MapPin className="h-4 w-4 shrink-0 text-promo" />
-                <span className="min-w-0 flex-1 truncate">{city || "Choisir une ville"}</span>
-                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-              </button>
-              {cityOpen ? (
-                <div className="absolute z-30 mt-2 w-full overflow-hidden rounded-xl border border-border bg-popover shadow-lift">
-                  <input
-                    autoFocus
-                    value={cityQuery}
-                    onChange={(e) => setCityQuery(e.target.value)}
-                    placeholder="Ville, village ou code postal…"
-                    className="w-full border-b border-border bg-transparent px-3 py-2.5 text-sm text-foreground outline-none"
-                  />
-                  <ul className="max-h-56 overflow-auto py-1">
-                    {citySuggestions.map((v) => (
-                      <li key={v.id}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedVille(v);
-                            setSelectedQuartierId(null);
-                            setCityOpen(false);
-                            setCityQuery("");
-                          }}
-                          aria-current={v.id === selectedVille?.id}
-                          className={`w-full px-3 py-2 text-left text-sm text-popover-foreground hover:bg-secondary ${
-                            v.id === selectedVille?.id ? "font-bold" : ""
-                          }`}
-                        >
-                          {v.nom}
-                        </button>
-                      </li>
-                    ))}
-                    {villesQuery.isLoading ? (
-                      <li className="px-3 py-2 text-sm text-muted-foreground">Chargement…</li>
-                    ) : null}
-                    {!villesQuery.isLoading && citySuggestions.length === 0 ? (
-                      <li className="px-3 py-2 text-sm text-muted-foreground">Aucune commune</li>
-                    ) : null}
-                  </ul>
-                </div>
-              ) : null}
-            </div>
+            <CitySelect
+              villes={villes}
+              loading={villesLoading}
+              selected={selectedVille}
+              onSelect={(v) => selectVille(v.id)}
+            />
 
             <form
               onSubmit={(e) => {

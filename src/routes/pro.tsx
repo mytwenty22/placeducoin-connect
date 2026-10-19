@@ -30,6 +30,7 @@ import { OfferCard } from "@/components/OfferCard";
 import { ConversionStats } from "@/components/ConversionStats";
 import { RoiStats, RoiSummaryCard } from "@/components/RoiStats";
 import { CouponPinCard } from "@/components/CouponPinCard";
+import { MarketplaceCityCard } from "@/components/MarketplaceCityCard";
 import { PosterButton } from "@/components/PosterButton";
 import { ProQuickGuide } from "@/components/ProQuickGuide";
 import { ShopLocationField } from "@/components/ShopLocationField";
@@ -635,6 +636,10 @@ function ProDashboard({ userId }: { userId: string }) {
         <PosterButton commerce={commerce} />
       </div>
 
+      <div className="mt-6">
+        <MarketplaceCityCard />
+      </div>
+
       {/* Résumé ROI, sauf sur l'onglet Statistiques qui affiche déjà le détail. */}
       {screen !== "stats" ? (
         <div className="mt-6">
@@ -816,6 +821,7 @@ function CreateCommerceForm({
           const { villeId, quartierId } = await resolveLocality(locality);
           void queryClient.invalidateQueries({ queryKey: ["quartiers"] });
           void queryClient.invalidateQueries({ queryKey: ["villes"] });
+          void queryClient.invalidateQueries({ queryKey: ["own-commerce-ville"] });
           // Position GPS déduite de l'adresse pour l'activation des promos en caisse ; sans
           // résultat fiable la fiche est créée quand même, le commerçant la renseignera depuis
           // Mon Profil.
@@ -1160,6 +1166,7 @@ function ProfileScreen({
           }
           void queryClient.invalidateQueries({ queryKey: ["quartiers"] });
           void queryClient.invalidateQueries({ queryKey: ["villes"] });
+          void queryClient.invalidateQueries({ queryKey: ["own-commerce-ville"] });
           const { error } = await supabase
             .from("commerces")
             .update({
