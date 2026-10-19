@@ -91,13 +91,30 @@ function markerIcon(L: Leaflet, c: CommerceListing) {
  * localisé, recalculé à chaque changement de ville, de quartier, de catégorie ou de recherche.
  * Rouge = offre en cours, étoile = En Vedette ; clic = nom, note et offre active.
  */
+export type MapBounds = { south: number; west: number; north: number; east: number };
+
 export function CommerceMap({
   commerces,
   inseeCode,
+  fitKey,
+  onUserMove,
   className = "",
 }: {
-  commerces: (CommerceListing & { latitude?: number | null; longitude?: number | null })[];
+  /** `inseeCode` par fiche : sa commune, quand elle diffère de la ville affichée (exploration). */
+  commerces: (CommerceListing & {
+    latitude?: number | null;
+    longitude?: number | null;
+    inseeCode?: string | null;
+  })[];
   inseeCode: string | null;
+  /**
+   * Identifie la liste "principale" (ville, quartier, filtres) : la carte se recadre sur ses
+   * marqueurs quand cette clé change, mais plus jamais de force une fois que le visiteur a
+   * déplacé ou zoomé la carte lui-même.
+   */
+  fitKey: string;
+  /** Zone visible après un déplacement ou un zoom fait par le visiteur. */
+  onUserMove?: (bounds: MapBounds) => void;
   className?: string;
 }) {
   const navigate = useNavigate();
@@ -105,22 +122,44 @@ export function CommerceMap({
   const mapRef = useRef<LeafletMap | null>(null);
   const layerRef = useRef<LayerGroup | null>(null);
   const [leaflet, setLeaflet] = useState<Leaflet | null>(null);
+  // Le visiteur a pris la main sur la carte depuis le dernier changement de fitKey.
+  const userMovedRef = useRef(false);
+  const onUserMoveRef = useRef(onUserMove);
+  onUserMoveRef.current = onUserMove;
+  useEffect(() => {
+    userMovedRef.current = false;
+  }, [fitKey]);
 
-  // Adresses à géocoder : uniquement les fiches sans position GPS enregistrée.
-  const toGeocode = useMemo(
-    () =>
-      commerces
-        .filter((c) => (c.latitude == null || c.longitude == null) && c.address.trim())
-        .map((c) => c.address.trim())
-        .sort(),
-    [commerces],
-  );
+  // Adresses à géocoder : uniquement les fiches sans position GPS enregistrée, regroupées par
+  // commune (chaque adresse est cherchée dans SA commune, jamais dans la ville affichée).
+  const toGeocode = useMemo(() => {
+    const groups = new Map<string, Set<string>>();
+    for (const c of commerces) {
+      const address = c.address.trim();
+      const insee = c.inseeCode ?? inseeCode;
+      if ((c.latitude != null && c.longitude != null) || !address || !insee) continue;
+      if (!groups.has(insee)) groups.set(insee, new Set());
+      groups.get(insee)!.add(address);
+    }
+    return [...groups.entries()]
+      .map(([insee, addresses]) => [insee, [...addresses].sort()] as const)
+      .sort(([a], [b]) => a.localeCompare(b));
+  }, [commerces, inseeCode]);
 
   const geocodeQuery = useQuery({
-    queryKey: ["map-geocode", inseeCode, toGeocode],
-    queryFn: () => geocodeAddresses(toGeocode, inseeCode!),
-    enabled: Boolean(inseeCode) && toGeocode.length > 0,
+    queryKey: ["map-geocode", toGeocode],
+    queryFn: async () => {
+      const positions = new Map<string, LatLng>();
+      for (const [insee, addresses] of toGeocode) {
+        const found = await geocodeAddresses(addresses, insee);
+        for (const [address, position] of found) positions.set(`${insee}|${address}`, position);
+      }
+      return positions;
+    },
+    enabled: toGeocode.length > 0,
     staleTime: Infinity,
+    // Garde les marqueurs déjà placés pendant le géocodage des nouvelles adresses.
+    placeholderData: (previous) => previous,
   });
 
   const centerQuery = useQuery({
@@ -139,7 +178,7 @@ export function CommerceMap({
       const position =
         c.latitude != null && c.longitude != null
           ? { lat: c.latitude, lng: c.longitude }
-          : geocodeQuery.data?.get(c.address.trim());
+          : geocodeQuery.data?.get(`${c.inseeCode ?? inseeCode}|${c.address.trim()}`);
       if (!position) continue;
       const key = `${position.lat.toFixed(5)},${position.lng.toFixed(5)}`;
       const rank = seen.get(key) ?? 0;
@@ -155,7 +194,7 @@ export function CommerceMap({
       });
     }
     return result;
-  }, [commerces, geocodeQuery.data]);
+  }, [commerces, geocodeQuery.data, inseeCode]);
 
   // Leaflet manipule window dès son import : chargé côté navigateur uniquement.
   useEffect(() => {
@@ -185,7 +224,33 @@ export function CommerceMap({
       .addTo(map);
     layerRef.current = leaflet.layerGroup().addTo(map);
     mapRef.current = map;
+
+    // Geste du visiteur (glisser, boutons de zoom, double-clic, pincement) : on arrête de recadrer
+    // et on signale la zone visible pour y charger les commerces, quelle que soit leur commune.
+    // "dragstart"/"zoomstart" ne suffisent pas à distinguer un zoom programmatique : on marque le
+    // geste au pointeur sur la carte elle-même.
+    let gesture = false;
+    const container = map.getContainer();
+    const markGesture = () => {
+      gesture = true;
+    };
+    container.addEventListener("pointerdown", markGesture);
+    container.addEventListener("wheel", markGesture, { passive: true });
+    map.on("moveend", () => {
+      if (!gesture) return;
+      gesture = false;
+      userMovedRef.current = true;
+      const b = map.getBounds();
+      onUserMoveRef.current?.({
+        south: b.getSouth(),
+        west: b.getWest(),
+        north: b.getNorth(),
+        east: b.getEast(),
+      });
+    });
     return () => {
+      container.removeEventListener("pointerdown", markGesture);
+      container.removeEventListener("wheel", markGesture);
       map.remove();
       mapRef.current = null;
       layerRef.current = null;
@@ -210,13 +275,16 @@ export function CommerceMap({
         })
         .addTo(layer);
     }
+    // Recadrage sur la liste principale uniquement tant que le visiteur n'a pas bougé la carte :
+    // les repères chargés pendant qu'il explore ne doivent pas le ramener de force sur la ville.
+    if (userMovedRef.current) return;
     if (placed.length > 0) {
       const bounds = leaflet.latLngBounds(placed.map((c) => [c.position!.lat, c.position!.lng]));
       map.fitBounds(bounds, { padding: [36, 36], maxZoom: 16 });
     } else if (centerQuery.data) {
       map.setView([centerQuery.data.lat, centerQuery.data.lng], 14);
     }
-  }, [leaflet, placed, centerQuery.data, navigate]);
+  }, [leaflet, placed, centerQuery.data, navigate, fitKey]);
 
   const unplaced = commerces.length - placed.length;
   const locating = geocodeQuery.isFetching;

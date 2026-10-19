@@ -9,7 +9,8 @@ import { SponsorBanner } from "@/components/SponsorBanner";
 import { BottomSponsorBanner } from "@/components/BottomSponsorBanner";
 import { InstallAppBanner } from "@/components/InstallAppBanner";
 import { PushOptInCard } from "@/components/PushOptIn";
-import { CommerceMap } from "@/components/CommerceMap";
+import { CommerceMap, type MapBounds } from "@/components/CommerceMap";
+import { fetchCommuneCenter } from "@/lib/map-geocode";
 import { OfferCard } from "@/components/OfferCard";
 import { RadiusSelector } from "@/components/RadiusSelector";
 import {
@@ -83,6 +84,7 @@ type PromoEmbed = {
   valide_jusqu_a: string;
   created_at: string;
 };
+type VilleEmbed = { nom: string; insee_code: string | null };
 type CommerceRow = {
   id: string;
   slug: string;
@@ -105,7 +107,14 @@ type CommerceRow = {
   latitude: number | null;
   longitude: number | null;
   promos: PromoEmbed[];
+  villes?: VilleEmbed | VilleEmbed[] | null;
 };
+
+const COMMERCE_COLUMNS =
+  "id, slug, nom, trade, category, adresse, telephone, photo_url, logo_url, description, horaires, theme_visuel, site_actif, boost_actif, boost_expires_at, google_rating, google_review_count, quartier_id, latitude, longitude, promos(id, titre, kind, photo_url, prix_avant, prix_maintenant, valide_jusqu_a, created_at)";
+
+// Plafond de repères chargés pour la zone visible de la carte (exploration hors de la ville).
+const MAP_AREA_LIMIT = 300;
 
 // Une offre est encore "active" tant que sa date de fin n'est pas passée -- la requête filtre
 // déjà côté serveur (`.gt("promos.valide_jusqu_a", …)`), ce second filtre ne fait que se prémunir
@@ -254,9 +263,7 @@ function Marketplace() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("commerces")
-        .select(
-          "id, slug, nom, trade, category, adresse, telephone, photo_url, logo_url, description, horaires, theme_visuel, site_actif, boost_actif, boost_expires_at, google_rating, google_review_count, quartier_id, latitude, longitude, promos(id, titre, kind, photo_url, prix_avant, prix_maintenant, valide_jusqu_a, created_at)",
-        )
+        .select(COMMERCE_COLUMNS)
         .eq("ville_id", selectedVille?.id)
         .gt("promos.valide_jusqu_a", new Date().toISOString());
       if (error) throw error;
@@ -341,10 +348,124 @@ function Marketplace() {
     return sortByTier(data.filter((c) => c.category === category));
   }, [commercesQuery.data, activeQuartierId, isSearching, searchQuery, category]);
 
-  const filteredWithDistance = withComputedDistance(filtered, position);
-  const visibleCommerces = radiusApplies
-    ? filteredWithDistance.filter((c) => c.distanceKm <= radiusKm)
-    : filteredWithDistance;
+  // Mémoïsé : la carte redessine ses marqueurs (et ferme un pop-up ouvert) à chaque nouvelle liste.
+  const visibleCommerces = useMemo(() => {
+    const withDistance = withComputedDistance(filtered, position);
+    return radiusApplies ? withDistance.filter((c) => c.distanceKm <= radiusKm) : withDistance;
+  }, [filtered, position, radiusApplies, radiusKm]);
+
+  // Exploration libre de la carte : quand le visiteur la déplace ou zoome, on charge aussi les
+  // commerces localisés dans la zone visible, quelle que soit leur commune (un commerçant de
+  // Bordeaux qui glisse vers Canéjan y voit les repères et les offres). La zone est rattachée à la
+  // ville affichée : changer de ville repart de la liste de cette ville.
+  const [mapArea, setMapArea] = useState<{ villeId: string; bounds: MapBounds } | null>(null);
+  const areaBounds = mapArea && mapArea.villeId === selectedVille?.id ? mapArea.bounds : null;
+  // Arrondi (~1 km) : petits glissements = même requête en cache.
+  const areaKey = areaBounds
+    ? [areaBounds.south, areaBounds.west, areaBounds.north, areaBounds.east].map((n) =>
+        n.toFixed(2),
+      )
+    : null;
+  // Centre de chaque commune (geo.api.gouv.fr, gardé en cache) : sert à savoir quelles communes
+  // tombent dans la zone visible, pour y afficher aussi leurs fiches sans position GPS (placées
+  // ensuite par géocodage de l'adresse dans leur commune).
+  const villeCentersQuery = useQuery({
+    queryKey: ["ville-centers", villes.map((v) => v.insee_code ?? "").join(",")],
+    enabled: showMap && areaKey !== null && villes.length > 0,
+    staleTime: Infinity,
+    queryFn: async () => {
+      const centers = new Map<string, { lat: number; lng: number }>();
+      const withInsee = villes.filter((v) => v.insee_code);
+      for (let i = 0; i < withInsee.length; i += 5) {
+        const batch = withInsee.slice(i, i + 5);
+        const found = await Promise.all(batch.map((v) => fetchCommuneCenter(v.insee_code!)));
+        batch.forEach((v, j) => {
+          const center = found[j] ?? cityCenter(v.nom);
+          if (center) centers.set(v.id, center);
+        });
+      }
+      return centers;
+    },
+  });
+  const nearbyVilleIds = useMemo(() => {
+    if (!areaKey || !villeCentersQuery.data) return [];
+    const [south, west, north, east] = areaKey.map(Number) as [number, number, number, number];
+    // Marge (~3 km) : une commune dont le centre est juste hors cadre a souvent des fiches dedans.
+    const m = 0.03;
+    return villes
+      .filter((v) => {
+        const c = villeCentersQuery.data.get(v.id);
+        return (
+          c && c.lat >= south - m && c.lat <= north + m && c.lng >= west - m && c.lng <= east + m
+        );
+      })
+      .map((v) => v.id)
+      .sort();
+  }, [areaKey, villeCentersQuery.data, villes]);
+
+  const mapAreaQuery = useQuery({
+    queryKey: ["commerces-map-area", areaKey, nearbyVilleIds],
+    enabled: showMap && areaKey !== null,
+    staleTime: 30_000,
+    placeholderData: (previous) => previous,
+    queryFn: async () => {
+      const [south, west, north, east] = areaKey!.map(Number) as [number, number, number, number];
+      const nowIso = new Date().toISOString();
+      const columns = `${COMMERCE_COLUMNS}, villes(nom, insee_code)`;
+      // 1) Fiches localisées (GPS) dans la zone, toutes communes confondues.
+      const located = supabase
+        .from("commerces")
+        .select(columns)
+        .gte("latitude", south - 0.01)
+        .lte("latitude", north + 0.01)
+        .gte("longitude", west - 0.01)
+        .lte("longitude", east + 0.01)
+        .gt("promos.valide_jusqu_a", nowIso)
+        .limit(MAP_AREA_LIMIT);
+      // 2) Fiches sans GPS des communes de la zone (placées par géocodage de leur adresse).
+      const unlocated =
+        nearbyVilleIds.length > 0
+          ? supabase
+              .from("commerces")
+              .select(columns)
+              .in("ville_id", nearbyVilleIds)
+              .is("latitude", null)
+              .gt("promos.valide_jusqu_a", nowIso)
+              .limit(MAP_AREA_LIMIT)
+          : null;
+      const [a, b] = await Promise.all([located, unlocated]);
+      if (a.error) throw a.error;
+      if (b?.error) throw b.error;
+      const rows = [...(a.data ?? []), ...(b?.data ?? [])] as unknown as CommerceRow[];
+      return rows.map((row) => {
+        const v = Array.isArray(row.villes) ? row.villes[0] : row.villes;
+        return {
+          ...mapCommerceToListing(row, v?.nom ?? ""),
+          inseeCode: v?.insee_code ?? null,
+        };
+      });
+    },
+  });
+  // Liste de la ville (avec tous ses filtres) + repères des autres communes de la zone, filtrés
+  // par la même catégorie / recherche.
+  const mapCommerces = useMemo(() => {
+    const inCity = new Set((commercesQuery.data ?? []).map((c) => c.id));
+    const extra = (mapAreaQuery.data ?? []).filter(
+      (c) =>
+        !inCity.has(c.id) &&
+        (isSearching
+          ? matchesSearch(c, searchQuery)
+          : category === null || c.category === category),
+    );
+    return [...visibleCommerces, ...extra];
+  }, [
+    commercesQuery.data,
+    mapAreaQuery.data,
+    visibleCommerces,
+    isSearching,
+    searchQuery,
+    category,
+  ]);
 
   // Encart VIP "À la une" : réservé aux commerces qui cumulent Site Pro ET l'option Vedette 24h
   // en cours -- pas juste l'un ou l'autre. Dès que le boost expire (isBoostActive côté requête)
@@ -586,8 +707,16 @@ function Marketplace() {
           </button>
           {showMap ? (
             <CommerceMap
-              commerces={visibleCommerces}
+              commerces={mapCommerces}
               inseeCode={selectedVille.insee_code}
+              fitKey={[
+                selectedVille.id,
+                activeQuartierId ?? "",
+                category ?? "",
+                searchQuery,
+                radiusApplies ? radiusKm : "",
+              ].join("|")}
+              onUserMove={(bounds) => setMapArea({ villeId: selectedVille.id, bounds })}
               className="mt-3 h-72 sm:h-96"
             />
           ) : null}
