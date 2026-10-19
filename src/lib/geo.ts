@@ -16,7 +16,22 @@ const CITY_COORDS: Record<string, LatLng> = {
   "Saint-Émilion": { lat: 44.8926, lng: -0.1557 },
   Vannes: { lat: 47.6582, lng: -2.7603 },
   Canéjan: { lat: 44.7658, lng: -0.6494 },
+  Bordeaux: { lat: 44.8378, lng: -0.5792 },
+  Pessac: { lat: 44.8067, lng: -0.6311 },
+  Mérignac: { lat: 44.8386, lng: -0.6436 },
+  Talence: { lat: 44.8086, lng: -0.5889 },
+  Gradignan: { lat: 44.7725, lng: -0.6156 },
+  Cestas: { lat: 44.7425, lng: -0.6814 },
+  Bègles: { lat: 44.8086, lng: -0.5478 },
+  "Villenave-d'Ornon": { lat: 44.7806, lng: -0.5658 },
+  "Le Haillan": { lat: 44.8725, lng: -0.6775 },
+  Léognan: { lat: 44.7286, lng: -0.5994 },
 };
+
+/** Centre approximatif d'une commune connue, ou null. */
+export function cityCenter(cityName: string): LatLng | null {
+  return CITY_COORDS[cityName] ?? null;
+}
 
 const DEFAULT_COORDS: LatLng = { lat: 48.8566, lng: 2.3522 };
 
@@ -56,15 +71,24 @@ export function haversineKm(a: LatLng, b: LatLng): number {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-export function withComputedDistance<T extends { slug: string; city: string; distanceKm: number }>(
-  offers: T[],
-  position: LatLng | null,
-): T[] {
+export function withComputedDistance<
+  T extends {
+    slug: string;
+    city: string;
+    distanceKm: number;
+    latitude?: number | null;
+    longitude?: number | null;
+  },
+>(offers: T[], position: LatLng | null): T[] {
   if (!position) return offers;
-  return offers.map((offer) => ({
-    ...offer,
-    distanceKm: Math.round(haversineKm(position, derivePosition(offer.slug, offer.city)) * 10) / 10,
-  }));
+  return offers.map((offer) => {
+    // Position réelle de la boutique quand le commerçant l'a renseignée ; sinon position dérivée.
+    const shop =
+      offer.latitude != null && offer.longitude != null
+        ? { lat: offer.latitude, lng: offer.longitude }
+        : derivePosition(offer.slug, offer.city);
+    return { ...offer, distanceKm: Math.round(haversineKm(position, shop) * 10) / 10 };
+  });
 }
 
 export type PositionErrorKind = "unsupported" | "denied" | "unavailable" | "timeout";

@@ -284,13 +284,15 @@ function OffersCarousel({
                 </div>
               </div>
               <div className="mt-auto flex flex-col items-start gap-3 px-5 py-4">
-                {/* Sans position GPS du commerce, pas de validation sur place : coupon simple. */}
-                {hasLocation ? (
+                {/* Sans position GPS du commerce, validation directe par code commerçant. Les
+                    fiches de démonstration (sans commerce en base) gardent le coupon simple. */}
+                {commerceId ? (
                   <ActivateOfferButton
                     promoId={p.id}
                     shopName={shop}
                     promoTitle={p.title}
                     commerceId={commerceId}
+                    pinOnly={!hasLocation}
                   />
                 ) : (
                   <CouponButton commerceId={commerceId} />

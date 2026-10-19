@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Search, MapPin, ChevronDown, Megaphone, Building2, Map as MapIcon } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
@@ -25,7 +25,7 @@ import {
 } from "@/lib/placeducoin-data";
 import { supabase } from "@/lib/supabase";
 import { normalizeSearch } from "@/lib/utils";
-import { withComputedDistance } from "@/lib/geo";
+import { cityCenter, haversineKm, withComputedDistance } from "@/lib/geo";
 import { isBoostActive } from "@/lib/boost";
 import { useUserPrefs } from "@/lib/user-prefs";
 import { useVedetteAlerts } from "@/hooks/use-vedette-alerts";
@@ -65,6 +65,10 @@ type Quartier = { id: string; nom: string; code_postal: string; ville_id: string
 const ALL_QUARTIERS = "all";
 
 const MAP_PREF_KEY = "spotlocal:home-map";
+
+// Au-delà de cette distance du centre de la commune affichée, le visiteur est considéré comme
+// consultant une autre commune que la sienne : le filtre par rayon ne s'applique plus.
+const IN_CITY_MAX_KM = 5;
 
 // Ville et quartier choisis par le visiteur, mémorisés sur l'appareil : en revenant d'une fiche
 // (bouton Retour, logo, onglet Marketplace…) l'accueil se rouvre sur la même commune au lieu de
@@ -251,6 +255,23 @@ function Marketplace() {
     );
   const [cityQuery, setCityQuery] = useState("");
   const [cityOpen, setCityOpen] = useState(false);
+  const cityMenuRef = useRef<HTMLDivElement>(null);
+  // Le menu des communes se referme au clic à l'extérieur ou avec Échap.
+  useEffect(() => {
+    if (!cityOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (!cityMenuRef.current?.contains(e.target as Node)) setCityOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setCityOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [cityOpen]);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<CategoryKey | null>(null);
   // Carte affichée d'office sur grand écran, repliée sur mobile (la liste reste visible sous les
@@ -327,10 +348,11 @@ function Marketplace() {
           const q = cityQuery.trim().toLowerCase();
           return (
             v.nom.toLowerCase().includes(q) ||
-            (/^d+$/.test(q) && v.codes_postaux.some((cp) => cp.startsWith(q)))
+            (/^\d+$/.test(q) && v.codes_postaux.some((cp) => cp.startsWith(q)))
           );
-        })
-        .slice(0, 6),
+        }),
+    // Toutes les communes sont listées (liste défilante) : chacun peut passer librement de l'une
+    // à l'autre, sans avoir à connaître le nom exact pour la faire apparaître.
     [villesQuery.data, cityQuery],
   );
 
@@ -363,6 +385,25 @@ function Marketplace() {
   useMarketplaceRealtime();
 
   const commercesWithDistance = withComputedDistance(commercesQuery.data ?? [], position);
+
+  // Le rayon "autour de moi" ne s'applique que si le visiteur se trouve dans la commune affichée.
+  // Quand il en choisit une autre (un commerçant de Canéjan qui consulte Bordeaux…), toutes les
+  // fiches de cette commune s'affichent au lieu d'une liste vidée par la distance.
+  const villeCenter = useMemo(() => {
+    const located = (commercesQuery.data ?? []).filter(
+      (c) => c.latitude != null && c.longitude != null,
+    );
+    if (located.length === 0) return cityCenter(city);
+    return {
+      lat: located.reduce((sum, c) => sum + c.latitude!, 0) / located.length,
+      lng: located.reduce((sum, c) => sum + c.longitude!, 0) / located.length,
+    };
+  }, [commercesQuery.data, city]);
+  const radiusApplies =
+    position !== null &&
+    villeCenter !== null &&
+    haversineKm(position, villeCenter) <= IN_CITY_MAX_KM;
+  const browsingOtherCity = hasPosition && !radiusApplies;
   useVedetteAlerts(commercesWithDistance, { radiusKm, favoriteCategories, hasPosition });
 
   const searchQuery = normalizeSearch(query);
@@ -414,7 +455,7 @@ function Marketplace() {
   }, [commercesQuery.data, activeQuartierId, isSearching, searchQuery, category]);
 
   const filteredWithDistance = withComputedDistance(filtered, position);
-  const visibleCommerces = hasPosition
+  const visibleCommerces = radiusApplies
     ? filteredWithDistance.filter((c) => c.distanceKm <= radiusKm)
     : filteredWithDistance;
 
@@ -425,7 +466,7 @@ function Marketplace() {
     (c) =>
       c.sponsored &&
       c.premium &&
-      (!hasPosition || c.distanceKm <= radiusKm) &&
+      (!radiusApplies || c.distanceKm <= radiusKm) &&
       (!activeQuartierId || c.quartierId === activeQuartierId),
   );
 
@@ -506,9 +547,10 @@ function Marketplace() {
           </div>
 
           <div className="mt-4 grid gap-3 sm:mt-5 sm:grid-cols-[minmax(0,260px)_minmax(0,1fr)]">
-            <div className="relative">
+            <div ref={cityMenuRef} className="relative">
               <button
                 type="button"
+                aria-expanded={cityOpen}
                 onClick={() => setCityOpen((v) => !v)}
                 className="flex w-full items-center gap-2 rounded-xl bg-card px-3 py-3 text-left text-sm font-semibold text-foreground shadow-card"
               >
@@ -536,7 +578,10 @@ function Marketplace() {
                             setCityOpen(false);
                             setCityQuery("");
                           }}
-                          className="w-full px-3 py-2 text-left text-sm text-popover-foreground hover:bg-secondary"
+                          aria-current={v.id === selectedVille?.id}
+                          className={`w-full px-3 py-2 text-left text-sm text-popover-foreground hover:bg-secondary ${
+                            v.id === selectedVille?.id ? "font-bold" : ""
+                          }`}
                         >
                           {v.nom}
                         </button>
@@ -676,8 +721,13 @@ function Marketplace() {
           {category === null
             ? "Tous les commerces, toutes catégories confondues."
             : CATEGORIES.find((c) => c.key === category)?.sub.join(" · ")}
-          {hasPosition ? ` · Dans un rayon de ${radiusKm} km autour de vous` : ""}
+          {radiusApplies ? ` · Dans un rayon de ${radiusKm} km autour de vous` : ""}
         </p>
+        {browsingOtherCity && city ? (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Vous consultez {city} : tous ses commerces sont affichés, sans limite de distance.
+          </p>
+        ) : null}
       </section>
 
       {/* Carte OpenStreetMap des fiches affichées (ville, quartier, catégorie, recherche). */}
@@ -776,7 +826,7 @@ function Marketplace() {
                     </button>
                   </>
                 ) : category === null ? (
-                  hasPosition ? (
+                  radiusApplies ? (
                     `Aucun commerce à moins de ${radiusKm} km à ${city}.`
                   ) : (
                     `Aucun commerce à ${city} pour le moment.`

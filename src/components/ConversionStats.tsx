@@ -79,7 +79,8 @@ export function ConversionStats({
           Conversions en boutique
         </h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          Clients qui ont activé une promo depuis votre boutique (à moins de 100 m).
+          Clients qui ont activé une promo depuis votre boutique (à moins de 100 m, ou avec votre
+          code commerçant).
         </p>
       </div>
 
@@ -87,8 +88,8 @@ export function ConversionStats({
         <div className="flex items-start gap-2 rounded-xl border border-promo/40 bg-promo/5 p-3 text-xs text-foreground">
           <MapPinOff className="mt-0.5 h-4 w-4 shrink-0 text-promo" />
           <p>
-            Le bouton « Utiliser ce coupon sur place » est masqué sur votre fiche tant que la
-            position GPS de votre boutique n'est pas renseignée.{" "}
+            Sans position GPS de votre boutique, vos clients ne peuvent valider leurs coupons
+            qu'avec votre code commerçant.{" "}
             <button type="button" onClick={onGoToProfile} className="font-bold text-navy underline">
               Renseigner ma position
             </button>

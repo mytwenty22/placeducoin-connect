@@ -29,6 +29,7 @@ import { SponsorBanner } from "@/components/SponsorBanner";
 import { OfferCard } from "@/components/OfferCard";
 import { ConversionStats } from "@/components/ConversionStats";
 import { RoiStats, RoiSummaryCard } from "@/components/RoiStats";
+import { CouponPinCard } from "@/components/CouponPinCard";
 import { PosterButton } from "@/components/PosterButton";
 import { ProQuickGuide } from "@/components/ProQuickGuide";
 import { ShopLocationField } from "@/components/ShopLocationField";
@@ -1999,6 +2000,8 @@ function StatsScreen({
         hasLocation={commerce.latitude !== null && commerce.longitude !== null}
         onGoToProfile={onGoToProfile}
       />
+
+      <CouponPinCard commerceId={commerceId} />
     </div>
   );
 }

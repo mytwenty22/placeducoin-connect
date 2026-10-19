@@ -3,7 +3,6 @@ import { useEffect, type ReactNode } from "react";
 import { Phone, Navigation, Clock, MapPin, CalendarDays, Instagram, Package } from "lucide-react";
 import { BackButton } from "@/components/BackButton";
 import { GoogleRatingStars } from "@/components/GoogleRatingStars";
-import { CouponButton } from "@/components/CouponButton";
 import { ActivateOfferButton } from "@/components/ActivateOfferButton";
 import { FavoriteButton } from "@/components/FavoriteButton";
 import { FeaturedEventBlock } from "@/components/FeaturedEventBlock";
@@ -375,22 +374,17 @@ function StandaloneSite() {
                             ) : null}
                           </div>
                         ) : null}
-                        {/* Sans position GPS du commerce, pas de validation sur place : on garde le
-                            coupon simple. */}
-                        {commerce.latitude == null || commerce.longitude == null ? (
-                          <CouponButton commerceId={commerce.id} compact className="shrink-0" />
-                        ) : null}
                       </div>
-                      {commerce.latitude != null && commerce.longitude != null ? (
-                        <ActivateOfferButton
-                          promoId={p.id}
-                          shopName={commerce.nom}
-                          promoTitle={p.titre}
-                          commerceId={commerce.id}
-                          compact
-                          className="mt-2"
-                        />
-                      ) : null}
+                      {/* Sans position GPS du commerce : validation directe par code commerçant. */}
+                      <ActivateOfferButton
+                        promoId={p.id}
+                        shopName={commerce.nom}
+                        promoTitle={p.titre}
+                        commerceId={commerce.id}
+                        pinOnly={commerce.latitude == null || commerce.longitude == null}
+                        compact
+                        className="mt-2"
+                      />
                     </div>
                   ))}
                 </div>
