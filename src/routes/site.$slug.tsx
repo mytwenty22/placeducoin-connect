@@ -13,6 +13,7 @@ import { computeOpenStatus, type Horaire } from "@/lib/horaires";
 import { getReadableTextColor } from "@/lib/color";
 import { THEME_STYLES, type ThemeVisuel } from "@/lib/site-theme";
 import { logStatEvent, isFromGoogleReferrer } from "@/lib/stats-tracking";
+import { validateOfferSearch } from "@/lib/offer-search";
 
 type SiteCommerce = {
   id: string;
@@ -67,6 +68,7 @@ function instagramHref(value: string) {
 }
 
 export const Route = createFileRoute("/site/$slug")({
+  validateSearch: validateOfferSearch,
   loader: async ({ params }) => {
     const { data: commerce } = await supabase
       .from("commerces")
@@ -83,8 +85,7 @@ export const Route = createFileRoute("/site/$slug")({
       .eq("commerce_id", commerce.id)
       .in("kind", ["promo", "arrivage"])
       .gt("valide_jusqu_a", new Date().toISOString())
-      .order("created_at", { ascending: false })
-      .limit(3);
+      .order("valide_jusqu_a", { ascending: true });
 
     const { data: event } = await supabase
       .from("promos")
@@ -164,6 +165,14 @@ function DescriptionBlock({ text, mutedClass }: { text: string; mutedClass: stri
 
 function StandaloneSite() {
   const { commerce, promos, event, produits } = Route.useLoaderData();
+  const { offre } = Route.useSearch();
+  const preselectedId = promos.some((p) => p.id === offre) ? offre : undefined;
+
+  // Offre cliquée sur la marketplace : on l'amène à l'écran dès l'ouverture du site.
+  useEffect(() => {
+    if (!preselectedId) return;
+    document.getElementById(`offre-${preselectedId}`)?.scrollIntoView({ block: "center" });
+  }, [preselectedId]);
 
   useEffect(() => {
     if (!commerce.site_actif) return;
@@ -313,7 +322,7 @@ function StandaloneSite() {
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">
         <div className="grid gap-6 lg:grid-cols-3 lg:items-start">
           <div className="space-y-6 lg:col-span-2">
-            {/* Offres & Promotions : jusqu'à 3, en liste verticale */}
+            {/* Offres & Promotions : toutes les offres actives, chacune avec son coupon */}
             {promos.length > 0 ? (
               <section className={`${cardClass} p-5`}>
                 <h2 className={`font-display text-lg font-extrabold ${headingClass}`}>
@@ -321,7 +330,15 @@ function StandaloneSite() {
                 </h2>
                 <div className={`mt-3 divide-y ${dividerClass}`}>
                   {promos.map((p) => (
-                    <div key={p.id} className="py-3 first:pt-0 last:pb-0">
+                    <div
+                      key={p.id}
+                      id={`offre-${p.id}`}
+                      className={`py-3 first:pt-0 last:pb-0 ${
+                        p.id === preselectedId
+                          ? "-mx-2 rounded-xl px-2 ring-2 ring-promo first:pt-3 last:pb-3"
+                          : ""
+                      }`}
+                    >
                       <div className="flex items-center gap-3">
                         {p.photo_url ? (
                           <img

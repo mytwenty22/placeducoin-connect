@@ -60,9 +60,12 @@ export function OfferCard({ commerce }: { commerce: CommerceListing }) {
   const isEvent = current?.kind === "evenement";
   const headerPhoto = current?.photoUrl ?? commerce.photoUrl;
 
+  // L'offre affichée dans le carrousel au moment du clic est pré-sélectionnée sur la fiche
+  // (les événements n'ont pas de coupon : rien à pré-sélectionner).
+  const search = current && !isEvent ? { offre: current.id } : {};
   const destination = commerce.premium
-    ? ({ to: "/site/$slug", params: { slug: commerce.slug } } as const)
-    : ({ to: "/commerce/$slug", params: { slug: commerce.slug } } as const);
+    ? ({ to: "/site/$slug", params: { slug: commerce.slug }, search } as const)
+    : ({ to: "/commerce/$slug", params: { slug: commerce.slug }, search } as const);
 
   // Statistique "Vues des offres" de l'Espace Pro : la carte doit être visible à moitié au moins.
   useEffect(() => {

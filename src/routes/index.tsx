@@ -65,6 +65,35 @@ type Quartier = { id: string; nom: string; code_postal: string; ville_id: string
 const ALL_QUARTIERS = "all";
 
 const MAP_PREF_KEY = "spotlocal:home-map";
+
+// Ville et quartier choisis par le visiteur, mémorisés sur l'appareil : en revenant d'une fiche
+// (bouton Retour, logo, onglet Marketplace…) l'accueil se rouvre sur la même commune au lieu de
+// retomber sur la commune par défaut.
+const VILLE_PREF_KEY = "spotlocal:home-ville";
+type StoredVille = { villeId: string; quartierId: string | null };
+
+function readStoredVille(): StoredVille | null {
+  try {
+    const raw = window.localStorage.getItem(VILLE_PREF_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<StoredVille>;
+    if (typeof parsed.villeId !== "string") return null;
+    return {
+      villeId: parsed.villeId,
+      quartierId: typeof parsed.quartierId === "string" ? parsed.quartierId : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredVille(value: StoredVille) {
+  try {
+    window.localStorage.setItem(VILLE_PREF_KEY, JSON.stringify(value));
+  } catch {
+    // Stockage indisponible : la ville ne sera pas mémorisée.
+  }
+}
 type PublicNotice = {
   id: string;
   titre: string;
@@ -263,18 +292,32 @@ function Marketplace() {
     },
   });
 
-  // Les villes sont désormais créées à la volée par les Pros (ensure-ville) : par défaut on ouvre
-  // la commune la plus fournie plutôt que la première par ordre alphabétique.
+  // Ville initiale : celle mémorisée sur l'appareil (avec son quartier) si elle existe toujours ;
+  // sinon -- les villes étant créées à la volée par les Pros (ensure-ville) -- la commune la plus
+  // fournie plutôt que la première par ordre alphabétique.
   useEffect(() => {
+    if (selectedVille) return;
     const villes = villesQuery.data ?? [];
+    const stored = readStoredVille();
+    const remembered = stored ? villes.find((v) => v.id === stored.villeId) : undefined;
+    if (remembered) {
+      setSelectedVille(remembered);
+      if (stored?.quartierId) {
+        setQuartierSelection({ villeId: remembered.id, quartierId: stored.quartierId });
+      }
+      return;
+    }
     const busiest = villes.reduce<(typeof villes)[number] | undefined>(
       (best, v) => (!best || v.commerceCount > best.commerceCount ? v : best),
       undefined,
     );
-    if (!selectedVille && busiest) {
-      setSelectedVille(busiest);
-    }
+    if (busiest) setSelectedVille(busiest);
   }, [selectedVille, villesQuery.data]);
+
+  useEffect(() => {
+    if (!selectedVille) return;
+    writeStoredVille({ villeId: selectedVille.id, quartierId: selectedQuartierId });
+  }, [selectedVille, selectedQuartierId]);
 
   const citySuggestions = useMemo(
     () =>

@@ -390,7 +390,11 @@ export function ActivateOfferButton({
                 <Link
                   to="/compte"
                   search={{
-                    redirect: typeof window !== "undefined" ? window.location.pathname : "/",
+                    // Avec la query (?offre=…) : au retour, la même offre reste pré-sélectionnée.
+                    redirect:
+                      typeof window !== "undefined"
+                        ? window.location.pathname + window.location.search
+                        : "/",
                   }}
                   className="font-bold text-navy underline"
                 >

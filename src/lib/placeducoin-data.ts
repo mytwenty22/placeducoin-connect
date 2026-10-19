@@ -71,6 +71,8 @@ export type Offer = {
   googleReviewCount?: number;
   /** Prochain événement à venir de la fiche, mis en avant dans l'en-tête de la page détaillée. */
   featuredEvent?: { title: string; date: string; description?: string; photoUrl?: string };
+  /** Toutes les offres actives (promo/arrivage) de la fiche, la plus urgente en premier. */
+  activePromos?: PromoItem[];
 };
 
 // Une "offre" ponctuelle (promo/arrivage/événement) affichée dans le carrousel d'une carte
