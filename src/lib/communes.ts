@@ -44,3 +44,47 @@ export async function locateAddress(
     return null;
   }
 }
+
+export type CommuneWithCenter = {
+  nom: string;
+  code: string;
+  codesPostaux: string[];
+  centre: { lat: number; lng: number } | null;
+};
+
+/**
+ * Recherche de communes dans le référentiel national (geo.api.gouv.fr), pour le menu de ville :
+ * par code postal complet (5 chiffres) ou par nom (3 caractères minimum, communes les plus
+ * peuplées en premier). Renvoie [] en cas d'indisponibilité : la recherche locale suffit alors.
+ */
+export async function searchCommunes(query: string): Promise<CommuneWithCenter[]> {
+  const q = query.trim();
+  const digits = q.replace(/\s/g, "");
+  const params = new URLSearchParams({ fields: "nom,code,codesPostaux,centre" });
+  if (/^\d{5}$/.test(digits)) params.set("codePostal", digits);
+  else if (q.length >= 3 && !/^\d+$/.test(digits)) {
+    params.set("nom", q);
+    params.set("boost", "population");
+    params.set("limit", "6");
+  } else return [];
+  try {
+    const response = await fetch(`${GEO_API_URL}?${params.toString()}`);
+    if (!response.ok) return [];
+    const json = (await response.json()) as {
+      nom: string;
+      code: string;
+      codesPostaux?: string[];
+      centre?: { coordinates?: [number, number] };
+    }[];
+    return json.map((c) => ({
+      nom: c.nom,
+      code: c.code,
+      codesPostaux: c.codesPostaux ?? [],
+      centre: c.centre?.coordinates
+        ? { lat: c.centre.coordinates[1], lng: c.centre.coordinates[0] }
+        : null,
+    }));
+  } catch {
+    return [];
+  }
+}

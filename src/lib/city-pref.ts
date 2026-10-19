@@ -10,20 +10,53 @@ import { useSyncExternalStore } from "react";
 const KEY = "spotlocal:ville-choice";
 const CHANGE_EVENT = "spotlocal:ville-choice-change";
 
-export type CityChoice = { villeId: string; quartierId: string | null };
+/** Commune du référentiel national sans fiche SpotLocal (pas encore dans la table villes). */
+export type ExternalCommune = { insee: string; nom: string; lat: number; lng: number };
+
+/**
+ * Choix de zone :
+ *  - une commune SpotLocal (`villeId`), éventuellement restreinte à un quartier OU à un code
+ *    postal (Bordeaux 33200) ;
+ *  - ou une commune du référentiel sans fiche (`external`, ex. Talence 33400) : la Marketplace
+ *    affiche alors les bons plans des alentours.
+ */
+export type CityChoice =
+  | { villeId: string; quartierId: string | null; codePostal: string | null; external?: undefined }
+  | {
+      villeId: null;
+      quartierId: null;
+      codePostal: string | null;
+      external: ExternalCommune;
+    };
 
 // Repli en mémoire quand localStorage est bloqué (navigation privée stricte…).
 let memoryChoice: string | null = null;
 
+const str = (v: unknown) => (typeof v === "string" && v ? v : null);
+
 function parse(raw: string | null): CityChoice | null {
   if (!raw) return null;
   try {
-    const parsed = JSON.parse(raw) as Partial<CityChoice>;
-    if (typeof parsed.villeId !== "string") return null;
-    return {
-      villeId: parsed.villeId,
-      quartierId: typeof parsed.quartierId === "string" ? parsed.quartierId : null,
-    };
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const codePostal = str(parsed["codePostal"]);
+    const ext = parsed["external"] as Partial<ExternalCommune> | undefined;
+    if (
+      ext &&
+      typeof ext.insee === "string" &&
+      typeof ext.nom === "string" &&
+      typeof ext.lat === "number" &&
+      typeof ext.lng === "number"
+    ) {
+      return {
+        villeId: null,
+        quartierId: null,
+        codePostal,
+        external: { insee: ext.insee, nom: ext.nom, lat: ext.lat, lng: ext.lng },
+      };
+    }
+    const villeId = str(parsed["villeId"]);
+    if (!villeId) return null;
+    return { villeId, quartierId: str(parsed["quartierId"]), codePostal };
   } catch {
     return null;
   }

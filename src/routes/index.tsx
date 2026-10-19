@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Search, MapPin, Megaphone, Building2, Map as MapIcon } from "lucide-react";
+import { Search, MapPin, Megaphone, Building2, Map as MapIcon, X } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { CitySelect } from "@/components/CitySelect";
 import { useSelectedVille } from "@/hooks/use-villes";
@@ -104,6 +104,7 @@ type CommerceRow = {
   google_rating: number | null;
   google_review_count: number | null;
   quartier_id: string | null;
+  code_postal: string | null;
   latitude: number | null;
   longitude: number | null;
   promos: PromoEmbed[];
@@ -111,7 +112,7 @@ type CommerceRow = {
 };
 
 const COMMERCE_COLUMNS =
-  "id, slug, nom, trade, category, adresse, telephone, photo_url, logo_url, description, horaires, theme_visuel, site_actif, boost_actif, boost_expires_at, google_rating, google_review_count, quartier_id, latitude, longitude, promos(id, titre, kind, photo_url, prix_avant, prix_maintenant, valide_jusqu_a, created_at)";
+  "id, slug, nom, trade, category, adresse, telephone, photo_url, logo_url, description, horaires, theme_visuel, site_actif, boost_actif, boost_expires_at, google_rating, google_review_count, quartier_id, code_postal, latitude, longitude, promos(id, titre, kind, photo_url, prix_avant, prix_maintenant, valide_jusqu_a, created_at)";
 
 // Plafond de repères chargés pour la zone visible de la carte (exploration hors de la ville).
 const MAP_AREA_LIMIT = 300;
@@ -156,6 +157,7 @@ function mapCommerceToListing(row: CommerceRow, fallbackCity: string): CommerceL
     category: row.category,
     city: fallbackCity,
     quartierId: row.quartier_id,
+    codePostal: row.code_postal,
     latitude: row.latitude,
     longitude: row.longitude,
     distanceKm: 0,
@@ -222,9 +224,14 @@ function Marketplace() {
     villesLoading,
     ville: selectedVille,
     quartierId: selectedQuartierId,
-    selectVille,
+    codePostal: selectedCodePostal,
+    chooseOption,
+    clearCodePostal,
     selectQuartier: setSelectedQuartierId,
   } = useSelectedVille();
+  // Commune du référentiel sans fiche SpotLocal (ex. Talence 33400) : pas de requête par
+  // ville_id, la liste et la carte montrent les bons plans des alentours.
+  const isExternal = Boolean(selectedVille?.external);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<CategoryKey | null>(null);
   // Carte affichée d'office sur grand écran, repliée sur mobile (la liste reste visible sous les
@@ -269,7 +276,7 @@ function Marketplace() {
       if (error) throw error;
       return (data as unknown as CommerceRow[]).map((row) => mapCommerceToListing(row, city));
     },
-    enabled: !!selectedVille,
+    enabled: !!selectedVille && !isExternal,
     // L'option Vedette expire au bout de 24h sans qu'aucune écriture en base ne le déclenche :
     // un refetch périodique est nécessaire pour que l'expiration se reflète "immédiatement" même
     // sur un onglet resté ouvert (les annulations explicites, elles, arrivent par Realtime).
@@ -284,6 +291,7 @@ function Marketplace() {
   // Quand il en choisit une autre (un commerçant de Canéjan qui consulte Bordeaux…), toutes les
   // fiches de cette commune s'affichent au lieu d'une liste vidée par la distance.
   const villeCenter = useMemo(() => {
+    if (selectedVille?.external) return selectedVille.external;
     const located = (commercesQuery.data ?? []).filter(
       (c) => c.latitude != null && c.longitude != null,
     );
@@ -292,7 +300,7 @@ function Marketplace() {
       lat: located.reduce((sum, c) => sum + c.latitude!, 0) / located.length,
       lng: located.reduce((sum, c) => sum + c.longitude!, 0) / located.length,
     };
-  }, [commercesQuery.data, city]);
+  }, [commercesQuery.data, city, selectedVille?.external]);
   const radiusApplies =
     position !== null &&
     villeCenter !== null &&
@@ -316,7 +324,7 @@ function Marketplace() {
       if (error) throw error;
       return data as Quartier[];
     },
-    enabled: !!selectedVille,
+    enabled: !!selectedVille && !isExternal,
   });
   const quartierCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -337,29 +345,30 @@ function Marketplace() {
   const activeQuartierId = quartiers.some((q) => q.id === selectedQuartierId)
     ? selectedQuartierId
     : null;
-
-  const filtered = useMemo(() => {
-    const all = commercesQuery.data ?? [];
-    const data = activeQuartierId ? all.filter((c) => c.quartierId === activeQuartierId) : all;
-    if (isSearching) {
-      return sortByTier(data.filter((c) => matchesSearch(c, searchQuery)));
-    }
-    if (category === null) return sortByTier(data);
-    return sortByTier(data.filter((c) => c.category === category));
-  }, [commercesQuery.data, activeQuartierId, isSearching, searchQuery, category]);
-
-  // Mémoïsé : la carte redessine ses marqueurs (et ferme un pop-up ouvert) à chaque nouvelle liste.
-  const visibleCommerces = useMemo(() => {
-    const withDistance = withComputedDistance(filtered, position);
-    return radiusApplies ? withDistance.filter((c) => c.distanceKm <= radiusKm) : withDistance;
-  }, [filtered, position, radiusApplies, radiusKm]);
+  const activeQuartierNom = quartiers.find((q) => q.id === activeQuartierId)?.nom ?? null;
 
   // Exploration libre de la carte : quand le visiteur la déplace ou zoome, on charge aussi les
   // commerces localisés dans la zone visible, quelle que soit leur commune (un commerçant de
   // Bordeaux qui glisse vers Canéjan y voit les repères et les offres). La zone est rattachée à la
   // ville affichée : changer de ville repart de la liste de cette ville.
   const [mapArea, setMapArea] = useState<{ villeId: string; bounds: MapBounds } | null>(null);
-  const areaBounds = mapArea && mapArea.villeId === selectedVille?.id ? mapArea.bounds : null;
+  // Commune sans fiche : zone d'environ 5 km autour de son centre, chargée d'office (liste + carte).
+  const externalCenter = selectedVille?.external;
+  const externalBounds = useMemo<MapBounds | null>(
+    () =>
+      externalCenter
+        ? {
+            south: externalCenter.lat - 0.045,
+            north: externalCenter.lat + 0.045,
+            west: externalCenter.lng - 0.065,
+            east: externalCenter.lng + 0.065,
+          }
+        : null,
+    [externalCenter],
+  );
+  const areaBounds =
+    mapArea && mapArea.villeId === selectedVille?.id ? mapArea.bounds : externalBounds;
+  const areaEnabled = showMap || isExternal;
   // Arrondi (~1 km) : petits glissements = même requête en cache.
   const areaKey = areaBounds
     ? [areaBounds.south, areaBounds.west, areaBounds.north, areaBounds.east].map((n) =>
@@ -371,7 +380,7 @@ function Marketplace() {
   // ensuite par géocodage de l'adresse dans leur commune).
   const villeCentersQuery = useQuery({
     queryKey: ["ville-centers", villes.map((v) => v.insee_code ?? "").join(",")],
-    enabled: showMap && areaKey !== null && villes.length > 0,
+    enabled: areaEnabled && areaKey !== null && villes.length > 0,
     staleTime: Infinity,
     queryFn: async () => {
       const centers = new Map<string, { lat: number; lng: number }>();
@@ -405,7 +414,7 @@ function Marketplace() {
 
   const mapAreaQuery = useQuery({
     queryKey: ["commerces-map-area", areaKey, nearbyVilleIds],
-    enabled: showMap && areaKey !== null,
+    enabled: areaEnabled && areaKey !== null,
     staleTime: 30_000,
     placeholderData: (previous) => previous,
     queryFn: async () => {
@@ -446,9 +455,43 @@ function Marketplace() {
       });
     },
   });
+  // Liste : les fiches de la commune (filtres quartier OU code postal, puis catégorie/recherche) ;
+  // pour une commune sans fiche, les fiches des alentours (catégorie/recherche seulement).
+  const filtered = useMemo(() => {
+    let data = (isExternal ? mapAreaQuery.data : commercesQuery.data) ?? [];
+    if (!isExternal && activeQuartierId) {
+      data = data.filter((c) => c.quartierId === activeQuartierId);
+    }
+    if (!isExternal && selectedCodePostal) {
+      data = data.filter((c) => c.codePostal === selectedCodePostal);
+    }
+    if (isSearching) {
+      return sortByTier(data.filter((c) => matchesSearch(c, searchQuery)));
+    }
+    if (category === null) return sortByTier(data);
+    return sortByTier(data.filter((c) => c.category === category));
+  }, [
+    isExternal,
+    mapAreaQuery.data,
+    commercesQuery.data,
+    activeQuartierId,
+    selectedCodePostal,
+    isSearching,
+    searchQuery,
+    category,
+  ]);
+  const listLoading = isExternal ? mapAreaQuery.isLoading : commercesQuery.isLoading;
+
+  // Mémoïsé : la carte redessine ses marqueurs (et ferme un pop-up ouvert) à chaque nouvelle liste.
+  const visibleCommerces = useMemo(() => {
+    const withDistance = withComputedDistance(filtered, position);
+    return radiusApplies ? withDistance.filter((c) => c.distanceKm <= radiusKm) : withDistance;
+  }, [filtered, position, radiusApplies, radiusKm]);
+
   // Liste de la ville (avec tous ses filtres) + repères des autres communes de la zone, filtrés
-  // par la même catégorie / recherche.
+  // par la même catégorie / recherche. Commune sans fiche : la liste EST déjà la zone.
   const mapCommerces = useMemo(() => {
+    if (isExternal) return visibleCommerces;
     const inCity = new Set((commercesQuery.data ?? []).map((c) => c.id));
     const extra = (mapAreaQuery.data ?? []).filter(
       (c) =>
@@ -459,6 +502,7 @@ function Marketplace() {
     );
     return [...visibleCommerces, ...extra];
   }, [
+    isExternal,
     commercesQuery.data,
     mapAreaQuery.data,
     visibleCommerces,
@@ -489,7 +533,7 @@ function Marketplace() {
       if (error) throw error;
       return data as PublicNotice[];
     },
-    enabled: !!selectedVille,
+    enabled: !!selectedVille && !isExternal,
   });
 
   const notices = noticesQuery.data ?? [];
@@ -510,7 +554,7 @@ function Marketplace() {
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedVille,
+    enabled: !!selectedVille && !isExternal,
     refetchInterval: 30_000,
   });
 
@@ -530,7 +574,7 @@ function Marketplace() {
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedVille,
+    enabled: !!selectedVille && !isExternal,
     refetchInterval: 30_000,
   });
 
@@ -559,7 +603,8 @@ function Marketplace() {
               villes={villes}
               loading={villesLoading}
               selected={selectedVille}
-              onSelect={(v) => selectVille(v.id)}
+              selectedDetail={selectedCodePostal ?? activeQuartierNom}
+              onChoose={chooseOption}
             />
 
             <form
@@ -618,6 +663,28 @@ function Marketplace() {
       <section className="mx-auto max-w-6xl px-4 pb-3 pt-4 sm:pb-4 sm:pt-6">
         {/* Filtre quartier : masqué si la commune n'a aucun quartier en base. La clé par ville
             remonte le menu à chaque changement de commune (aucune sélection résiduelle). */}
+        {isExternal ? (
+          <p className="mb-3 rounded-xl bg-secondary px-3 py-2 text-xs text-foreground">
+            Aucun commerce n'est encore inscrit à <span className="font-semibold">{city}</span> :
+            voici les bons plans des alentours (environ 5 km).
+          </p>
+        ) : null}
+        {selectedCodePostal ? (
+          <div className="mb-2 flex items-center gap-2 sm:mb-3">
+            <span className="hidden shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:block">
+              Code postal
+            </span>
+            <button
+              type="button"
+              onClick={clearCodePostal}
+              aria-label={`Retirer le filtre code postal ${selectedCodePostal}`}
+              className="inline-flex h-9 items-center gap-1.5 rounded-full border border-navy bg-navy px-3 text-xs font-semibold text-primary-foreground"
+            >
+              <MapPin className="h-3.5 w-3.5" /> {city} {selectedCodePostal}
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ) : null}
         {quartiers.length > 0 && selectedVille ? (
           <div className="mb-2 flex items-center gap-2 sm:mb-3">
             <label
@@ -717,6 +784,7 @@ function Marketplace() {
               fitKey={[
                 selectedVille.id,
                 activeQuartierId ?? "",
+                selectedCodePostal ?? "",
                 category ?? "",
                 searchQuery,
                 radiusApplies ? radiusKm : "",
@@ -740,7 +808,7 @@ function Marketplace() {
             </span>
           </div>
 
-          {commercesQuery.isLoading ? (
+          {listLoading ? (
             <p className="mt-4 text-sm text-muted-foreground">Chargement…</p>
           ) : visibleCommerces.length === 0 ? (
             <div className="mt-6 flex flex-col items-center gap-3 py-8 text-center">
@@ -783,14 +851,25 @@ function Marketplace() {
             {visibleCommerces.map((c) => (
               <OfferCard key={c.id} commerce={c} />
             ))}
-            {commercesQuery.isLoading ? (
-              <p className="text-sm text-muted-foreground">Chargement…</p>
-            ) : null}
-            {!commercesQuery.isLoading &&
+            {listLoading ? <p className="text-sm text-muted-foreground">Chargement…</p> : null}
+            {!listLoading &&
             visibleCommerces.length === 0 &&
             !(category === "locale" && notices.length > 0) ? (
               <p className="col-span-full text-sm text-muted-foreground">
-                {activeQuartierId ? (
+                {isExternal ? (
+                  `Aucun commerce inscrit autour de ${city} pour le moment.`
+                ) : selectedCodePostal ? (
+                  <>
+                    Aucune fiche en {selectedCodePostal} pour le moment.{" "}
+                    <button
+                      type="button"
+                      onClick={clearCodePostal}
+                      className="font-semibold text-navy underline"
+                    >
+                      Voir tout {city}
+                    </button>
+                  </>
+                ) : activeQuartierId ? (
                   <>
                     Aucune fiche dans le quartier «{" "}
                     {quartiers.find((q) => q.id === activeQuartierId)?.nom} » pour le moment.{" "}
@@ -815,7 +894,7 @@ function Marketplace() {
             ) : null}
           </div>
 
-          {selectedVille ? (
+          {selectedVille && !isExternal ? (
             <div className="mx-auto mt-8 max-w-xl">
               <PushOptInCard villeId={selectedVille.id} villeNom={selectedVille.nom} />
             </div>
