@@ -58,6 +58,8 @@ import {
   IdentifierFields,
   type IdentifierInput,
 } from "@/components/EntityIdentityForm";
+import { ProTermsCheckbox } from "@/components/legal/ProTermsCheckbox";
+import { PRO_TERMS_VERSION } from "@/lib/legal";
 
 type AccountType = "pro" | "association";
 
@@ -229,11 +231,21 @@ function ProAuthGate() {
   );
 }
 
+// Acceptation des CGU/CGV Espace Pro, horodatée et versionnée, enregistrée dans les métadonnées
+// du compte (preuve de l'acceptation, art. 21 des CGV).
+function proTermsAcceptance() {
+  return {
+    pro_terms_accepted_at: new Date().toISOString(),
+    pro_terms_version: PRO_TERMS_VERSION,
+  };
+}
+
 function ProSignupForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [accountType, setAccountType] = useState<AccountType>("pro");
   const [identifier, setIdentifier] = useState<IdentifierInput>({ identifier: "", pending: false });
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
 
   return (
@@ -241,6 +253,10 @@ function ProSignupForm() {
       className="surface-card mx-auto max-w-sm space-y-4 p-5"
       onSubmit={async (e) => {
         e.preventDefault();
+        if (!termsAccepted) {
+          toast.error("Vous devez accepter les CGU/CGV Espace Pro pour créer votre compte.");
+          return;
+        }
         const resolved = resolveIdentity(ENTITY_TYPE_BY_ACCOUNT[accountType], identifier, {
           allowPending: true,
         });
@@ -255,7 +271,9 @@ function ProSignupForm() {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { account_type: accountType, ...resolved.patch } },
+          options: {
+            data: { account_type: accountType, ...resolved.patch, ...proTermsAcceptance() },
+          },
         });
         if (error) {
           toast.error(error.message);
@@ -350,6 +368,7 @@ function ProSignupForm() {
           className="mt-1 w-full rounded-xl border border-input bg-card px-3 py-2.5 text-sm outline-none focus:border-navy"
         />
       </label>
+      <ProTermsCheckbox checked={termsAccepted} onChange={setTermsAccepted} />
       <button
         type="submit"
         disabled={loading}
@@ -799,6 +818,7 @@ function CreateCommerceForm({
     newQuartier: null,
   });
   const [telephone, setTelephone] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [pending, setPending] = useState(false);
   const queryClient = useQueryClient();
 
@@ -809,6 +829,10 @@ function CreateCommerceForm({
         e.preventDefault();
         if (!nom.trim()) {
           toast.error("Le nom est requis.");
+          return;
+        }
+        if (!termsAccepted) {
+          toast.error("Vous devez accepter les CGU/CGV Espace Pro pour créer votre fiche.");
           return;
         }
         const localityError = validateLocality(locality);
@@ -838,6 +862,12 @@ function CreateCommerceForm({
             telephone,
             ...(position ? { latitude: position.lat, longitude: position.lng } : {}),
           });
+          // Trace de l'acceptation pour cet établissement (best-effort : la fiche est déjà créée).
+          const { error: termsError } = await supabase.auth.updateUser({
+            data: { ...proTermsAcceptance(), pro_terms_etablissement: nom.trim() },
+          });
+          if (termsError)
+            console.error("Enregistrement de l'acceptation des CGV:", termsError.message);
           onCreated();
         } catch (error) {
           toast.error((error as Error).message);
@@ -904,6 +934,8 @@ function CreateCommerceForm({
         onChange={setTelephone}
         placeholder="04 50 12 34 56"
       />
+
+      <ProTermsCheckbox checked={termsAccepted} onChange={setTermsAccepted} />
 
       <button
         type="submit"

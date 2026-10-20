@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as CgvRouteImport } from './routes/cgv'
 import { Route as CompteRouteImport } from './routes/compte'
+import { Route as LegalRouteImport } from './routes/legal'
 import { Route as MairieRouteImport } from './routes/mairie'
 import { Route as ProRouteImport } from './routes/pro'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
@@ -37,6 +38,11 @@ const CgvRoute = CgvRouteImport.update({
 const CompteRoute = CompteRouteImport.update({
   id: '/compte',
   path: '/compte',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LegalRoute = LegalRouteImport.update({
+  id: '/legal',
+  path: '/legal',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MairieRoute = MairieRouteImport.update({
@@ -70,6 +76,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRoute
   '/cgv': typeof CgvRoute
   '/compte': typeof CompteRoute
+  '/legal': typeof LegalRoute
   '/mairie': typeof MairieRoute
   '/pro': typeof ProRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -81,6 +88,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminRoute
   '/cgv': typeof CgvRoute
   '/compte': typeof CompteRoute
+  '/legal': typeof LegalRoute
   '/mairie': typeof MairieRoute
   '/pro': typeof ProRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -93,6 +101,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRoute
   '/cgv': typeof CgvRoute
   '/compte': typeof CompteRoute
+  '/legal': typeof LegalRoute
   '/mairie': typeof MairieRoute
   '/pro': typeof ProRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -106,6 +115,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/cgv'
     | '/compte'
+    | '/legal'
     | '/mairie'
     | '/pro'
     | '/reset-password'
@@ -117,6 +127,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/cgv'
     | '/compte'
+    | '/legal'
     | '/mairie'
     | '/pro'
     | '/reset-password'
@@ -128,6 +139,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/cgv'
     | '/compte'
+    | '/legal'
     | '/mairie'
     | '/pro'
     | '/reset-password'
@@ -140,6 +152,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRoute
   CgvRoute: typeof CgvRoute
   CompteRoute: typeof CompteRoute
+  LegalRoute: typeof LegalRoute
   MairieRoute: typeof MairieRoute
   ProRoute: typeof ProRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
@@ -175,6 +188,13 @@ declare module '@tanstack/react-router' {
       path: '/compte'
       fullPath: '/compte'
       preLoaderRoute: typeof CompteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legal': {
+      id: '/legal'
+      path: '/legal'
+      fullPath: '/legal'
+      preLoaderRoute: typeof LegalRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/mairie': {
@@ -220,6 +240,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRoute,
   CgvRoute: CgvRoute,
   CompteRoute: CompteRoute,
+  LegalRoute: LegalRoute,
   MairieRoute: MairieRoute,
   ProRoute: ProRoute,
   ResetPasswordRoute: ResetPasswordRoute,

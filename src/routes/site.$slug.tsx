@@ -13,6 +13,7 @@ import { getReadableTextColor } from "@/lib/color";
 import { THEME_STYLES, type ThemeVisuel } from "@/lib/site-theme";
 import { logStatEvent, isFromGoogleReferrer } from "@/lib/stats-tracking";
 import { validateOfferSearch } from "@/lib/offer-search";
+import { LEGAL_DOCS } from "@/lib/legal";
 
 type SiteCommerce = {
   id: string;
@@ -559,9 +560,21 @@ function StandaloneSite() {
             SpotLocal
           </Link>
         </p>
-        <Link to="/cgv" className="mt-1 inline-block underline hover:no-underline">
-          Conditions Générales de Vente & Mentions Légales
-        </Link>
+        <nav
+          aria-label="Informations légales"
+          className="mt-1 flex flex-wrap justify-center gap-x-3 gap-y-1 px-4"
+        >
+          {LEGAL_DOCS.map((doc) => (
+            <Link
+              key={doc.key}
+              to="/legal"
+              search={{ doc: doc.key }}
+              className="underline hover:no-underline"
+            >
+              {doc.short}
+            </Link>
+          ))}
+        </nav>
       </footer>
 
       <InstallAppBanner />

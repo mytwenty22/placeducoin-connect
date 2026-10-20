@@ -35,6 +35,7 @@ import { useVedetteAlerts } from "@/hooks/use-vedette-alerts";
 import { useMarketplaceRealtime } from "@/hooks/use-marketplace-realtime";
 import type { Horaire } from "@/lib/horaires";
 import type { ThemeVisuel } from "@/lib/site-theme";
+import { LEGAL_DOCS } from "@/lib/legal";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -938,9 +939,21 @@ function Marketplace() {
 
       <footer className="bg-gradient-navy py-8 text-center text-sm text-primary-foreground/70">
         <p>SpotLocal — le commerce local, à portée de rue.</p>
-        <Link to="/cgv" className="mt-2 inline-block underline hover:text-primary-foreground">
-          Conditions Générales de Vente & Mentions Légales
-        </Link>
+        <nav
+          aria-label="Informations légales"
+          className="mt-3 flex flex-wrap justify-center gap-x-4 gap-y-1.5 px-4"
+        >
+          {LEGAL_DOCS.map((doc) => (
+            <Link
+              key={doc.key}
+              to="/legal"
+              search={{ doc: doc.key }}
+              className="underline hover:text-primary-foreground"
+            >
+              {doc.short}
+            </Link>
+          ))}
+        </nav>
       </footer>
 
       <InstallAppBanner />
