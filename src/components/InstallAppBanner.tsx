@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Download, MoreVertical, Share, SquarePlus, X } from "lucide-react";
+import { SpotLocalMark } from "@/components/SpotLocalLogo";
 import {
   confirmInstalledManually,
   dismissInstallBanner,
@@ -44,11 +45,9 @@ export function InstallAppBanner() {
       style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 0.75rem)" }}
     >
       <div className="flex items-center gap-3">
-        <img
-          src="/icons/icon-192.png"
-          alt=""
-          className="h-11 w-11 shrink-0 rounded-xl bg-promo object-cover"
-        />
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-promo text-promo-foreground">
+          <SpotLocalMark className="h-7 w-7" />
+        </span>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold leading-snug">
             Ajoutez SpotLocal à votre écran d'accueil
