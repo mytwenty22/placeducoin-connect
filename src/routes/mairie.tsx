@@ -6,6 +6,8 @@ import type { Session } from "@supabase/supabase-js";
 import { Building2, LogOut, Megaphone, Trash2 } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { EmailPasswordLogin } from "@/components/EmailPasswordLogin";
+import { CharteMairiesCheckbox } from "@/components/legal/TermsCheckbox";
+import { CHARTE_MAIRIES_VERSION } from "@/lib/legal";
 import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/mairie")({
@@ -77,7 +79,12 @@ function MairieSpace() {
 
   return (
     <PageShell>
-      <MairieDashboard userId={session.user.id} />
+      <MairieDashboard
+        userId={session.user.id}
+        charteAccepted={
+          session.user.user_metadata["charte_mairies_version"] === CHARTE_MAIRIES_VERSION
+        }
+      />
     </PageShell>
   );
 }
@@ -91,7 +98,7 @@ function PageShell({ children }: { children: ReactNode }) {
   );
 }
 
-function MairieDashboard({ userId }: { userId: string }) {
+function MairieDashboard({ userId, charteAccepted }: { userId: string; charteAccepted: boolean }) {
   const queryClient = useQueryClient();
 
   const profileQuery = useQuery({
@@ -197,6 +204,8 @@ function MairieDashboard({ userId }: { userId: string }) {
     );
   }
 
+  if (!charteAccepted) return <CharteGate villeNom={villeQuery.data?.nom} />;
+
   return (
     <div className="space-y-6">
       <header className="flex items-center gap-3 rounded-2xl bg-gradient-navy p-5 text-primary-foreground">
@@ -259,6 +268,55 @@ function MairieDashboard({ userId }: { userId: string }) {
         </section>
       </div>
     </div>
+  );
+}
+
+// Acceptation de la Charte (art. 1), une fois par agent et par version, enregistrée horodatée dans
+// les métadonnées du compte. La mise à jour de la session réaffiche ensuite le tableau de bord.
+function CharteGate({ villeNom }: { villeNom: string | undefined }) {
+  const [accepted, setAccepted] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  return (
+    <form
+      className="surface-card mx-auto max-w-lg space-y-4 p-5"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (!accepted) return;
+        setSaving(true);
+        const { error } = await supabase.auth.updateUser({
+          data: {
+            charte_mairies_accepted_at: new Date().toISOString(),
+            charte_mairies_version: CHARTE_MAIRIES_VERSION,
+          },
+        });
+        setSaving(false);
+        if (error) toast.error(error.message);
+      }}
+    >
+      <div className="flex items-center gap-2">
+        <Building2 className="h-5 w-5 text-mairie" />
+        <h1 className="font-display text-lg font-extrabold text-foreground">
+          Bienvenue dans l'Espace Mairie{villeNom ? ` de ${villeNom}` : ""}
+        </h1>
+      </div>
+      <p className="text-sm text-muted-foreground">
+        Avant votre première publication, merci de prendre connaissance de la Charte qui encadre
+        l'usage de l'Espace Mairie : information d'intérêt public, neutralité politique et
+        protection des données des habitants.
+      </p>
+      <CharteMairiesCheckbox checked={accepted} onChange={setAccepted} />
+      <button
+        type="submit"
+        disabled={saving}
+        className="w-full rounded-xl bg-mairie py-3 text-sm font-bold text-mairie-foreground disabled:opacity-60"
+      >
+        {saving ? "Enregistrement…" : "Accéder à l'Espace Mairie"}
+      </button>
+      <div className="flex justify-center">
+        <SignOutButton />
+      </div>
+    </form>
   );
 }
 

@@ -25,6 +25,10 @@ export const LEGAL_IDENTITY = {
 // modification substantielle du texte pour savoir quelle version chaque commerçant a acceptée.
 export const PRO_TERMS_VERSION = "2026-10-20";
 
+// Version de la Charte Espace Mairies acceptée par chaque agent : la changer à chaque
+// modification substantielle redemande l'acceptation à la prochaine connexion.
+export const CHARTE_MAIRIES_VERSION = "2026-10-20";
+
 export const LEGAL_DOCS = [
   { key: "mentions", title: "Mentions légales", short: "Mentions légales" },
   { key: "cgu", title: "CGU Particuliers & Politique de confidentialité", short: "CGU & RGPD" },

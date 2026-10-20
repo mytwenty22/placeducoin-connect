@@ -58,7 +58,7 @@ import {
   IdentifierFields,
   type IdentifierInput,
 } from "@/components/EntityIdentityForm";
-import { ProTermsCheckbox } from "@/components/legal/ProTermsCheckbox";
+import { ProTermsCheckbox } from "@/components/legal/TermsCheckbox";
 import { PRO_TERMS_VERSION } from "@/lib/legal";
 
 type AccountType = "pro" | "association";

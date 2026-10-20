@@ -1126,7 +1126,11 @@ export function CharteMairies() {
           Utilisateurs qui y ont consenti. L'utilisation de l'Espace Mairie emporte adhésion pleine
           et entière de la Collectivité à la présente Charte, que l'agent ou l'élu procédant à
           l'ouverture de l'accès déclare accepter au nom et pour le compte de la Collectivité, en
-          vertu d'une habilitation régulière de l'autorité territoriale.
+          vertu d'une habilitation régulière de l'autorité territoriale. Cette acceptation est
+          matérialisée par le cochage, par chaque agent ou élu, de la case prévue à cet effet lors
+          de sa première connexion à l'Espace Mairie et après toute modification substantielle de la
+          Charte ; la date, l'heure et la version de la Charte acceptée sont enregistrées par
+          SpotLocal.
         </P>
       </Art>
 
