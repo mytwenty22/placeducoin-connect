@@ -39,10 +39,11 @@ export function InstallAppButton() {
         type="button"
         onClick={() => void install()}
         aria-label="Installer l'application"
-        className="flex shrink-0 items-center gap-1.5 rounded-full bg-gradient-promo px-2.5 py-1.5 text-sm font-semibold text-promo-foreground transition-opacity hover:opacity-90 sm:px-3"
+        className="flex shrink-0 items-center gap-1.5 rounded-full bg-gradient-promo px-2.5 py-1.5 text-sm font-semibold text-promo-foreground transition-opacity hover:opacity-90 sm:px-3 xl:px-2.5"
       >
         <Download className="h-4 w-4 shrink-0" />
-        <span className="hidden sm:inline">Installer</span>
+        {/* Icône seule sur la ligne unique de l'en-tête (xl), déjà pleine. */}
+        <span className="hidden sm:inline xl:hidden">Installer</span>
       </button>
       <InstallGuideDialog open={guideOpen} onOpenChange={setGuideOpen} platform={device.platform} />
     </>
