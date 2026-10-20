@@ -6,6 +6,7 @@ import { BackButton } from "@/components/BackButton";
 import { RadiusSelector } from "@/components/RadiusSelector";
 import { NotificationBell } from "@/components/NotificationBell";
 import { PreferencesPanel } from "@/components/PreferencesPanel";
+import { SpotLocalMark, SpotLocalWordmark } from "@/components/SpotLocalLogo";
 import { supabase } from "@/lib/supabase";
 
 const NAV = [
@@ -37,12 +38,14 @@ export function AppHeader() {
             <BackButton className="text-primary-foreground/70 hover:text-primary-foreground" />
           ) : null}
           <Link to="/" className="flex min-w-0 items-center gap-2">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-promo text-promo-foreground font-display text-lg font-black">
-              S
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-promo text-promo-foreground">
+              <SpotLocalMark className="h-6 w-6" />
             </span>
-            <span className="truncate font-display text-lg font-extrabold tracking-tight">
-              SpotLocal
-            </span>
+            {/* Corail éclairci pour « Local » : le rouge promo manque de contraste sur le bleu marine. */}
+            <SpotLocalWordmark
+              className="h-[1.15rem] w-auto min-w-0 max-w-full"
+              localClassName="fill-[oklch(0.76_0.14_35)]"
+            />
           </Link>
         </div>
         <nav className="flex shrink-0 items-center gap-1">
