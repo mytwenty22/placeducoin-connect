@@ -37,7 +37,7 @@ export function AppHeader() {
             <BackButton className="text-primary-foreground/70 hover:text-primary-foreground" />
           ) : null}
           <Link to="/" className="flex min-w-0 items-center gap-2">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-promo text-promo-foreground font-display text-lg font-black">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-promo text-promo-foreground font-display text-lg font-black">
               S
             </span>
             <span className="truncate font-display text-lg font-extrabold tracking-tight">
