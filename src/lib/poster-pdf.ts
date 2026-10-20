@@ -1,3 +1,4 @@
+import { LOCAL, MARK, SPOT, WORDMARK_BOX } from "@/lib/spotlocal-logo";
 import { getSiteUrl } from "@/lib/site-url";
 
 export type PosterCommerce = {
@@ -73,6 +74,29 @@ const NAVY = "#141D3D";
 const RED = "#DC3B32";
 const GREY = "#5B6478";
 
+// Logo SpotLocal complet pour fond sombre (tuile dégradée + épingle, « Spot » blanc, « Local »
+// corail clair comme dans l'en-tête), en SVG rendu ensuite en PNG par loadImageAsPng.
+const { y: WORD_Y, width: WORD_W, height: WORD_H } = WORDMARK_BOX;
+const LOCKUP_TILE = 120;
+const LOCKUP_GAP = 28;
+const LOCKUP_TEXT_SCALE = (LOCKUP_TILE * 0.62) / WORD_H;
+const LOCKUP_W = LOCKUP_TILE + LOCKUP_GAP + WORD_W * LOCKUP_TEXT_SCALE;
+
+function brandLockupDataUrl() {
+  const markScale = (LOCKUP_TILE * 0.66) / 51.2;
+  const markX = LOCKUP_TILE / 2 - 32 * markScale;
+  const markY = LOCKUP_TILE / 2 - 32.6 * markScale;
+  const textY = LOCKUP_TILE / 2 - (WORD_Y + WORD_H / 2) * LOCKUP_TEXT_SCALE;
+  // Dimensions intrinsèques doublées : l'image est rastérisée nette pour l'impression.
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${LOCKUP_W * 2}" height="${LOCKUP_TILE * 2}" viewBox="0 0 ${LOCKUP_W} ${LOCKUP_TILE}">
+<defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#dc223a"/><stop offset="1" stop-color="#eb5833"/></linearGradient></defs>
+<rect width="${LOCKUP_TILE}" height="${LOCKUP_TILE}" rx="${LOCKUP_TILE * 0.26}" fill="url(#bg)"/>
+<path transform="translate(${markX} ${markY}) scale(${markScale})" fill="#ffffff" fill-rule="evenodd" d="${MARK}"/>
+<g transform="translate(${LOCKUP_TILE + LOCKUP_GAP} ${textY}) scale(${LOCKUP_TEXT_SCALE})">
+<path fill="#ffffff" d="${SPOT}"/><path fill="#fc8e72" d="${LOCAL}"/></g></svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
 /**
  * Génère et télécharge l'affiche vitrine A4 du commerce : nom, logo et QR code vers sa fiche.
  * `logoIncluded` vaut false quand un logo était configuré mais n'a pas pu être chargé, pour que
@@ -88,7 +112,10 @@ export async function downloadPosterPdf(commerce: PosterCommerce) {
     width: 1024,
     color: { dark: NAVY, light: "#FFFFFF" },
   });
-  const logo = commerce.logo_url ? await loadImageAsPng(commerce.logo_url) : null;
+  const [logo, brand] = await Promise.all([
+    commerce.logo_url ? loadImageAsPng(commerce.logo_url) : Promise.resolve(null),
+    loadImageAsPng(brandLockupDataUrl()),
+  ]);
 
   const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait", compress: true });
   const pageW = 210;
@@ -100,10 +127,16 @@ export async function downloadPosterPdf(commerce: PosterCommerce) {
   doc.setFillColor(RED);
   doc.rect(0, 112, pageW, 3, "F");
 
-  doc.setTextColor("#FFFFFF");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
-  doc.text("SpotLocal", center, 16, { align: "center", charSpace: 0.6 });
+  if (brand) {
+    const brandH = 11;
+    const brandW = (brand.width / brand.height) * brandH;
+    doc.addImage(brand.dataUrl, "PNG", center - brandW / 2, 7, brandW, brandH);
+  } else {
+    doc.setTextColor("#FFFFFF");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.text("SpotLocal", center, 16, { align: "center", charSpace: 0.6 });
+  }
 
   const logoBox = 44;
   const logoX = center - logoBox / 2;
