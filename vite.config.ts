@@ -24,7 +24,7 @@ export default defineConfig({
         // script into (the document is rendered per-request from __root.tsx) -- so injection is
         // off here, and the service worker is registered manually from __root.tsx instead.
         injectRegister: false,
-        includeAssets: ["favicon.ico", "icons/apple-touch-icon.png"],
+        includeAssets: ["favicon.svg", "favicon.ico", "icons/apple-touch-icon.png"],
         manifest: {
           name: "SpotLocal",
           short_name: "SpotLocal",
