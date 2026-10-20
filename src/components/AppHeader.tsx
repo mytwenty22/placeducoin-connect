@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Store, Building2, LayoutGrid, LogOut, Heart } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import { BackButton } from "@/components/BackButton";
+import { InstallAppButton } from "@/components/InstallAppButton";
 import { RadiusSelector } from "@/components/RadiusSelector";
 import { NotificationBell } from "@/components/NotificationBell";
 import { PreferencesPanel } from "@/components/PreferencesPanel";
@@ -37,13 +38,14 @@ export function AppHeader() {
           {!isHome ? (
             <BackButton className="text-primary-foreground/70 hover:text-primary-foreground" />
           ) : null}
-          <Link to="/" className="flex min-w-0 items-center gap-2">
+          <Link to="/" aria-label="SpotLocal, accueil" className="flex min-w-0 items-center gap-2">
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-promo text-promo-foreground">
               <SpotLocalMark className="h-6 w-6" />
             </span>
-            {/* Corail éclairci pour « Local » : le rouge promo manque de contraste sur le bleu marine. */}
+            {/* Sur mobile, la tuile seule : la nav en icônes ne laisse pas la place au logotype.
+                Corail éclairci pour « Local » : le rouge promo manque de contraste sur le bleu marine. */}
             <SpotLocalWordmark
-              className="h-[1.15rem] w-auto min-w-0 max-w-full"
+              className="hidden h-[1.15rem] w-auto min-w-0 max-w-full sm:block"
               localClassName="fill-[oklch(0.76_0.14_35)]"
             />
           </Link>
@@ -60,6 +62,9 @@ export function AppHeader() {
               <span className="hidden sm:inline">{label}</span>
             </Link>
           ))}
+          <div className="ml-1">
+            <InstallAppButton />
+          </div>
           {isHome ? (
             <div className="ml-1 flex items-center gap-1.5">
               <div className="hidden sm:block">

@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
-import { Download, MoreVertical, Share, SquarePlus, X } from "lucide-react";
+import { Download, X } from "lucide-react";
+import { InstallGuideDialog } from "@/components/InstallGuideDialog";
 import { SpotLocalMark } from "@/components/SpotLocalLogo";
 import {
-  confirmInstalledManually,
+  detectInstallPlatform,
   dismissInstallBanner,
-  isIos,
   isMobileDevice,
   promptInstall,
   useInstallState,
+  type InstallPlatform,
 } from "@/lib/pwa-install";
 
 /**
@@ -19,22 +20,22 @@ import {
 export function InstallAppBanner() {
   const { canPrompt, installed, dismissed, forced } = useInstallState();
   // Détection d'appareil après le montage : le rendu serveur ne connaît pas le navigateur.
-  const [device, setDevice] = useState<{ eligible: boolean; ios: boolean } | null>(null);
-  const [showSteps, setShowSteps] = useState(false);
+  const [device, setDevice] = useState<{ eligible: boolean; platform: InstallPlatform } | null>(
+    null,
+  );
+  const [guideOpen, setGuideOpen] = useState(false);
 
   useEffect(() => {
     const fromPoster = new URLSearchParams(window.location.search).get("app") === "1";
-    setDevice({ eligible: fromPoster || isMobileDevice(), ios: isIos() });
+    setDevice({ eligible: fromPoster || isMobileDevice(), platform: detectInstallPlatform() });
   }, []);
 
   if (!device || installed) return null;
   if (!forced && (dismissed || !device.eligible)) return null;
 
-  const { ios } = device;
-
   async function install() {
     const prompted = await promptInstall();
-    if (!prompted) setShowSteps(true);
+    if (!prompted) setGuideOpen(true);
   }
 
   return (
@@ -64,15 +65,15 @@ export function InstallAppBanner() {
           >
             <Download className="h-3.5 w-3.5" /> Installer
           </button>
-        ) : !showSteps ? (
+        ) : (
           <button
             type="button"
-            onClick={() => setShowSteps(true)}
+            onClick={() => setGuideOpen(true)}
             className="shrink-0 rounded-xl bg-promo px-3 py-2 text-xs font-bold text-promo-foreground hover:opacity-90"
           >
             Comment ?
           </button>
-        ) : null}
+        )}
         <button
           type="button"
           aria-label="Fermer"
@@ -82,53 +83,7 @@ export function InstallAppBanner() {
           <X className="h-4 w-4" />
         </button>
       </div>
-
-      {showSteps && !canPrompt ? (
-        <div className="mt-3 rounded-xl bg-primary-foreground/10 p-3 text-xs">
-          <ol className="space-y-1.5">
-            {ios ? (
-              <>
-                <li className="flex items-center gap-2">
-                  <Step n={1} /> Appuyez sur <Share className="h-4 w-4 shrink-0" />
-                  <strong>Partager</strong> dans la barre de Safari
-                </li>
-                <li className="flex items-center gap-2">
-                  <Step n={2} /> Choisissez <SquarePlus className="h-4 w-4 shrink-0" />
-                  <strong>Sur l'écran d'accueil</strong>
-                </li>
-              </>
-            ) : (
-              <>
-                <li className="flex items-center gap-2">
-                  <Step n={1} /> Ouvrez le menu <MoreVertical className="h-4 w-4 shrink-0" /> du
-                  navigateur
-                </li>
-                <li className="flex items-center gap-2">
-                  <Step n={2} /> Appuyez sur <strong>Installer l'application</strong>
-                </li>
-              </>
-            )}
-            <li className="flex items-center gap-2">
-              <Step n={3} /> Validez avec <strong>Ajouter</strong>
-            </li>
-          </ol>
-          <button
-            type="button"
-            onClick={confirmInstalledManually}
-            className="mt-3 w-full rounded-lg bg-primary-foreground/15 py-2 font-bold hover:bg-primary-foreground/20"
-          >
-            C'est fait
-          </button>
-        </div>
-      ) : null}
+      <InstallGuideDialog open={guideOpen} onOpenChange={setGuideOpen} platform={device.platform} />
     </div>
-  );
-}
-
-function Step({ n }: { n: number }) {
-  return (
-    <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-promo text-[11px] font-bold text-promo-foreground">
-      {n}
-    </span>
   );
 }

@@ -63,6 +63,24 @@ export function isIos() {
   );
 }
 
+/**
+ * Navigateur intégré à une appli (Instagram, Facebook, appli Google, Snapchat…) : pas d'ajout à
+ * l'écran d'accueil possible, il faut d'abord rouvrir la page dans Safari / Chrome.
+ */
+export function isInAppBrowser() {
+  return /FBAN|FBAV|FB_IAB|Instagram|Snapchat|musical_ly|TikTok|Line\/|LinkedInApp|Pinterest|GSA\//i.test(
+    navigator.userAgent,
+  );
+}
+
+export type InstallPlatform = "ios" | "android" | "in-app";
+
+/** Parcours d'installation manuelle à montrer quand l'invite native n'est pas disponible. */
+export function detectInstallPlatform(): InstallPlatform {
+  if (isInAppBrowser()) return "in-app";
+  return isIos() ? "ios" : "android";
+}
+
 export function isMobileDevice() {
   return window.matchMedia("(pointer: coarse)").matches && window.innerWidth < 1024;
 }
