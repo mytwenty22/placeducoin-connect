@@ -728,10 +728,11 @@ export function CgvPro() {
           L'acceptation des présentes Conditions est matérialisée par le cochage, par le Commerçant,
           de la case prévue à cet effet lors de la création de son compte et lors de la création de
           sa Fiche, accompagnée de la certification de son pouvoir de représenter l'Établissement.
-          La date, l'heure et la version des Conditions acceptées sont enregistrées par SpotLocal.
-          Les présentes Conditions prévalent sur tout autre document du Commerçant, et notamment sur
-          ses éventuelles conditions générales d'achat, sauf accord dérogatoire exprès et écrit de
-          SpotLocal.
+          La date et l'heure, fixées par les serveurs de SpotLocal, la version des Conditions
+          acceptées, l'adresse IP et le type de navigateur utilisés sont enregistrés par SpotLocal
+          dans un journal non modifiable. Les présentes Conditions prévalent sur tout autre document
+          du Commerçant, et notamment sur ses éventuelles conditions générales d'achat, sauf accord
+          dérogatoire exprès et écrit de SpotLocal.
         </P>
       </Art>
 
@@ -1017,10 +1018,14 @@ export function CgvPro() {
           et de l'intérêt légitime de SpotLocal, dans les conditions décrites dans la politique de
           confidentialité de la Plateforme. Les données de facturation sont conservées pendant dix
           ans à compter de la clôture de l'exercice concerné, conformément à l'article L. 123-22 du
-          Code de commerce. Les droits prévus par le RGPD s'exercent à l'adresse{" "}
-          <V>{ID.emailRgpd}</V>. Le Commerçant s'engage à utiliser les informations relatives aux
-          Utilisateurs auxquelles il pourrait avoir accès, notamment lors de la vérification d'un
-          Coupon, aux seules fins de cette vérification, et à ne pas les collecter ni les conserver.
+          Code de commerce. Les enregistrements de l'acceptation des présentes Conditions,
+          mentionnés à l'article 2, sont conservés pendant toute la durée de la relation
+          contractuelle puis pendant cinq ans à compter de son terme, aux fins de preuve,
+          conformément à l'article L. 110-4 du Code de commerce, y compris en cas de suppression du
+          compte. Les droits prévus par le RGPD s'exercent à l'adresse <V>{ID.emailRgpd}</V>. Le
+          Commerçant s'engage à utiliser les informations relatives aux Utilisateurs auxquelles il
+          pourrait avoir accès, notamment lors de la vérification d'un Coupon, aux seules fins de
+          cette vérification, et à ne pas les collecter ni les conserver.
         </P>
       </Art>
 
@@ -1129,8 +1134,10 @@ export function CharteMairies() {
           vertu d'une habilitation régulière de l'autorité territoriale. Cette acceptation est
           matérialisée par le cochage, par chaque agent ou élu, de la case prévue à cet effet lors
           de sa première connexion à l'Espace Mairie et après toute modification substantielle de la
-          Charte ; la date, l'heure et la version de la Charte acceptée sont enregistrées par
-          SpotLocal.
+          Charte ; la date et l'heure, fixées par les serveurs de SpotLocal, la version de la Charte
+          acceptée, l'adresse IP et le type de navigateur utilisés sont enregistrés par SpotLocal
+          dans un journal non modifiable et conservés pendant toute la durée d'utilisation de
+          l'Espace Mairie puis pendant cinq ans, aux fins de preuve.
         </P>
       </Art>
 

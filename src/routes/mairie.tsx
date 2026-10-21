@@ -8,7 +8,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { EmailPasswordLogin } from "@/components/EmailPasswordLogin";
 import { CharteMairiesCheckbox } from "@/components/legal/TermsCheckbox";
 import { deCommune } from "@/lib/french";
-import { CHARTE_MAIRIES_VERSION } from "@/lib/legal";
+import { CHARTE_MAIRIES_VERSION, recordLegalAcceptance } from "@/lib/legal";
 import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/mairie")({
@@ -80,12 +80,7 @@ function MairieSpace() {
 
   return (
     <PageShell>
-      <MairieDashboard
-        userId={session.user.id}
-        charteAccepted={
-          session.user.user_metadata["charte_mairies_version"] === CHARTE_MAIRIES_VERSION
-        }
-      />
+      <MairieDashboard userId={session.user.id} />
     </PageShell>
   );
 }
@@ -99,8 +94,24 @@ function PageShell({ children }: { children: ReactNode }) {
   );
 }
 
-function MairieDashboard({ userId, charteAccepted }: { userId: string; charteAccepted: boolean }) {
+function MairieDashboard({ userId }: { userId: string }) {
   const queryClient = useQueryClient();
+
+  // Acceptation de la version en vigueur de la Charte par cet agent (journal legal_acceptances).
+  const charteQuery = useQuery({
+    queryKey: ["charte-acceptance", userId, CHARTE_MAIRIES_VERSION],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("legal_acceptances")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("document", "charte-mairies")
+        .eq("version", CHARTE_MAIRIES_VERSION)
+        .limit(1);
+      if (error) throw error;
+      return data.length > 0;
+    },
+  });
 
   const profileQuery = useQuery({
     queryKey: ["profile", userId],
@@ -180,7 +191,8 @@ function MairieDashboard({ userId, charteAccepted }: { userId: string; charteAcc
     onError: (error: Error) => toast.error(error.message),
   });
 
-  if (profileQuery.isLoading) return <p className="text-sm text-muted-foreground">Chargement…</p>;
+  if (profileQuery.isLoading || charteQuery.isLoading)
+    return <p className="text-sm text-muted-foreground">Chargement…</p>;
 
   if (profileQuery.isError) {
     return (
@@ -205,7 +217,16 @@ function MairieDashboard({ userId, charteAccepted }: { userId: string; charteAcc
     );
   }
 
-  if (!charteAccepted) return <CharteGate villeNom={villeQuery.data?.nom} />;
+  if (!charteQuery.data) {
+    return (
+      <CharteGate
+        villeNom={villeQuery.data?.nom}
+        onAccepted={() =>
+          queryClient.invalidateQueries({ queryKey: ["charte-acceptance", userId] })
+        }
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -272,9 +293,15 @@ function MairieDashboard({ userId, charteAccepted }: { userId: string; charteAcc
   );
 }
 
-// Acceptation de la Charte (art. 1), une fois par agent et par version, enregistrée horodatée dans
-// les métadonnées du compte. La mise à jour de la session réaffiche ensuite le tableau de bord.
-function CharteGate({ villeNom }: { villeNom: string | undefined }) {
+// Acceptation de la Charte (art. 1), une fois par agent et par version, enregistrée dans le journal
+// legal_acceptances (horodatage serveur, adresse IP, navigateur).
+function CharteGate({
+  villeNom,
+  onAccepted,
+}: {
+  villeNom: string | undefined;
+  onAccepted: () => void;
+}) {
   const [accepted, setAccepted] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -285,14 +312,14 @@ function CharteGate({ villeNom }: { villeNom: string | undefined }) {
         e.preventDefault();
         if (!accepted) return;
         setSaving(true);
-        const { error } = await supabase.auth.updateUser({
-          data: {
-            charte_mairies_accepted_at: new Date().toISOString(),
-            charte_mairies_version: CHARTE_MAIRIES_VERSION,
-          },
-        });
-        setSaving(false);
-        if (error) toast.error(error.message);
+        try {
+          await recordLegalAcceptance("charte-mairies", CHARTE_MAIRIES_VERSION);
+          onAccepted();
+        } catch (error) {
+          toast.error((error as Error).message);
+        } finally {
+          setSaving(false);
+        }
       }}
     >
       <div className="flex items-center gap-2">

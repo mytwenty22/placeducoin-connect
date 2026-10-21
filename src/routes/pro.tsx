@@ -59,7 +59,7 @@ import {
   type IdentifierInput,
 } from "@/components/EntityIdentityForm";
 import { ProTermsCheckbox } from "@/components/legal/TermsCheckbox";
-import { PRO_TERMS_VERSION } from "@/lib/legal";
+import { PRO_TERMS_VERSION, recordLegalAcceptance } from "@/lib/legal";
 
 type AccountType = "pro" | "association";
 
@@ -231,8 +231,9 @@ function ProAuthGate() {
   );
 }
 
-// Acceptation des CGU/CGV Espace Pro, horodatée et versionnée, enregistrée dans les métadonnées
-// du compte (preuve de l'acceptation, art. 21 des CGV).
+// Acceptation des CGU/CGV Espace Pro à l'inscription : sans session à ce stade (confirmation par
+// e-mail), elle voyage dans les métadonnées d'inscription et le trigger
+// on_auth_user_created_legal_acceptance la copie dans le journal legal_acceptances (art. 21 des CGV).
 function proTermsAcceptance() {
   return {
     pro_terms_accepted_at: new Date().toISOString(),
@@ -862,12 +863,10 @@ function CreateCommerceForm({
             telephone,
             ...(position ? { latitude: position.lat, longitude: position.lng } : {}),
           });
-          // Trace de l'acceptation pour cet établissement (best-effort : la fiche est déjà créée).
-          const { error: termsError } = await supabase.auth.updateUser({
-            data: { ...proTermsAcceptance(), pro_terms_etablissement: nom.trim() },
-          });
-          if (termsError)
-            console.error("Enregistrement de l'acceptation des CGV:", termsError.message);
+          // Preuve de l'acceptation pour cet établissement (best-effort : la fiche est déjà créée).
+          await recordLegalAcceptance("cgv-pro", PRO_TERMS_VERSION).catch((termsError: Error) =>
+            console.error("Enregistrement de l'acceptation des CGV:", termsError.message),
+          );
           onCreated();
         } catch (error) {
           toast.error((error as Error).message);

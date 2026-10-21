@@ -1,3 +1,5 @@
+import { supabase } from "@/lib/supabase";
+
 // Informations légales de l'éditeur, reprises dans tous les documents juridiques (/legal).
 // Remplacer chaque valeur entre crochets par l'information réelle : tant qu'une valeur reste
 // entre crochets, elle est surlignée dans les textes affichés pour signaler qu'elle manque.
@@ -44,6 +46,18 @@ export type LegalDocKey = (typeof LEGAL_DOCS)[number]["key"];
 
 export function isLegalDocKey(value: unknown): value is LegalDocKey {
   return LEGAL_DOCS.some((doc) => doc.key === value);
+}
+
+/**
+ * Enregistre l'acceptation d'un document par l'utilisateur connecté dans le journal
+ * legal_acceptances (preuve horodatée par le serveur, avec adresse IP et navigateur).
+ */
+export async function recordLegalAcceptance(doc: "cgv-pro" | "charte-mairies", version: string) {
+  const { error } = await supabase.rpc("record_legal_acceptance", {
+    p_document: doc,
+    p_version: version,
+  });
+  if (error) throw new Error(error.message);
 }
 
 /** Une valeur encore entre crochets n'a pas été renseignée. */
