@@ -7,6 +7,7 @@ import { Building2, LogOut, Megaphone, Trash2 } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { EmailPasswordLogin } from "@/components/EmailPasswordLogin";
 import { CharteMairiesCheckbox } from "@/components/legal/TermsCheckbox";
+import { deCommune } from "@/lib/french";
 import { CHARTE_MAIRIES_VERSION } from "@/lib/legal";
 import { supabase } from "@/lib/supabase";
 
@@ -215,7 +216,7 @@ function MairieDashboard({ userId, charteAccepted }: { userId: string; charteAcc
         <div className="min-w-0 flex-1">
           <h1 className="truncate font-display text-2xl font-extrabold">Espace Mairie</h1>
           <p className="text-sm text-primary-foreground/70">
-            Mairie {villeQuery.data ? `de ${villeQuery.data.nom}` : ""} · accès gratuit dédié aux
+            Mairie {villeQuery.data ? deCommune(villeQuery.data.nom) : ""} · accès gratuit dédié aux
             agents municipaux
           </p>
         </div>
@@ -297,7 +298,7 @@ function CharteGate({ villeNom }: { villeNom: string | undefined }) {
       <div className="flex items-center gap-2">
         <Building2 className="h-5 w-5 text-mairie" />
         <h1 className="font-display text-lg font-extrabold text-foreground">
-          Bienvenue dans l'Espace Mairie{villeNom ? ` de ${villeNom}` : ""}
+          Bienvenue dans l'Espace Mairie{villeNom ? ` ${deCommune(villeNom)}` : ""}
         </h1>
       </div>
       <p className="text-sm text-muted-foreground">

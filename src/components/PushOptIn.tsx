@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { BellRing, Loader2, X, Zap } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/lib/supabase";
+import { deCommune } from "@/lib/french";
 import { CATEGORIES } from "@/lib/placeducoin-data";
 import { useUserPrefs } from "@/lib/user-prefs";
 import { useSession } from "@/hooks/use-session";
@@ -210,7 +211,7 @@ export function PushOptInCard({ villeId, villeNom }: { villeId: string; villeNom
       <div className="min-w-0 flex-1">
         <p className="text-sm font-bold text-foreground">Recevoir les bons plans du quartier</p>
         <p className="text-xs text-muted-foreground">
-          Une notification dès qu'un commerce de {villeNom} publie une offre.
+          Une notification dès qu'un commerce {deCommune(villeNom)} publie une offre.
         </p>
       </div>
       <button

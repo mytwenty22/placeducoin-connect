@@ -36,6 +36,7 @@ import { useMarketplaceRealtime } from "@/hooks/use-marketplace-realtime";
 import type { Horaire } from "@/lib/horaires";
 import type { ThemeVisuel } from "@/lib/site-theme";
 import { LEGAL_DOCS } from "@/lib/legal";
+import { deCommune } from "@/lib/french";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -717,7 +718,7 @@ function Marketplace() {
                 </div>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={ALL_QUARTIERS}>Tous les quartiers de {city}</SelectItem>
+                <SelectItem value={ALL_QUARTIERS}>Tous les quartiers {deCommune(city)}</SelectItem>
                 {quartiers.map((q) => (
                   <SelectItem key={q.id} value={q.id}>
                     {q.nom} ({quartierCounts.get(q.id) ?? 0})
