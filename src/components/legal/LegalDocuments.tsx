@@ -587,16 +587,22 @@ export function CguParticuliers() {
           <P>
             Les données relatives au Compte sont conservées pendant toute la durée de son existence,
             puis supprimées à la suite de la demande de suppression de l'Utilisateur ou à l'issue
-            d'une période d'inactivité de trois ans, l'Utilisateur étant préalablement informé de la
-            suppression envisagée. Les abonnements aux notifications Push Web sont conservés
-            jusqu'au retrait du consentement ou jusqu'à l'invalidation de l'adresse d'abonnement par
-            le navigateur. Les données relatives aux alertes par courrier électronique ou message
-            court sont conservées jusqu'à la désinscription de l'Utilisateur. Les données relatives
-            à la validation des Coupons sont conservées pendant une durée de trois ans à compter de
-            leur enregistrement, aux fins de preuve et de lutte contre la fraude. Les coordonnées
-            géographiques ne font l'objet d'aucune conservation. Les journaux techniques sont
-            conservés pour une durée maximale d'un an. À l'issue de ces durées, les données sont
-            supprimées ou rendues définitivement anonymes.
+            d'une période de trois ans sans aucune connexion au Compte. Dans ce dernier cas,
+            l'Utilisateur est informé de la suppression envisagée par un courrier électronique
+            adressé au moins trente jours avant celle-ci ; une connexion au Compte avant
+            l'expiration de ce délai suffit à en empêcher la suppression. Les abonnements aux
+            notifications Push Web sont conservés jusqu'au retrait du consentement ou jusqu'à
+            l'invalidation de l'adresse d'abonnement par le navigateur. Les données relatives aux
+            alertes par courrier électronique ou message court sont conservées jusqu'à la
+            désinscription de l'Utilisateur. Les données relatives à la validation des Coupons sont
+            conservées pendant une durée de trois ans à compter de leur enregistrement, aux fins de
+            preuve et de lutte contre la fraude, puis rendues définitivement anonymes par la
+            suppression de tout lien avec le Compte, seules des données statistiques étant
+            conservées au-delà. Les tentatives de saisie du code de validation d'un Commerçant,
+            enregistrées aux fins de prévention de la fraude, sont supprimées au bout de trente
+            jours. Les coordonnées géographiques ne font l'objet d'aucune conservation. Les journaux
+            techniques sont conservés pour une durée maximale d'un an. À l'issue de ces durées, les
+            données sont supprimées ou rendues définitivement anonymes.
           </P>
         </Art>
 

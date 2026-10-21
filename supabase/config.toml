@@ -426,3 +426,7 @@ verify_jwt = true
 [functions.send-mairie-alerts]
 # Même règle que send-promo-alerts (voir _shared/service-auth.ts).
 verify_jwt = true
+
+[functions.notify-inactive-accounts]
+# Appelée par la tâche pg_cron purge_expired_data ; même règle que send-promo-alerts.
+verify_jwt = true
