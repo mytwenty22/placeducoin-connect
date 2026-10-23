@@ -17,8 +17,8 @@ export const LEGAL_IDENTITY = {
   emailContact: "contact@spotlocal.fr",
   emailRgpd: "rgpd@spotlocal.fr",
   // Médiateur de la consommation (article L612-1 du Code de la consommation).
-  mediateurNom: "[MEDIATEUR_NOM]",
-  mediateurSite: "[MEDIATEUR_SITE]",
+  mediateurNom: "CNPM - Médiation - Consommation",
+  mediateurSite: "https://cnpm-mediation-consommation.eu",
   // Prix de l'Espace Pro : sans TVA facturée tant que l'éditeur n'y est pas assujetti.
   regimePrix: "nets, TVA non applicable (article 293 B du code général des impôts)",
   dateMiseAJour: "23 octobre 2026",
