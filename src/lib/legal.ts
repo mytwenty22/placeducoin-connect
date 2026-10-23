@@ -4,22 +4,23 @@ import { supabase } from "@/lib/supabase";
 // Remplacer chaque valeur entre crochets par l'information réelle : tant qu'une valeur reste
 // entre crochets, elle est surlignée dans les textes affichés pour signaler qu'elle manque.
 export const LEGAL_IDENTITY = {
-  nomSociete: "[NOM_SOCIETE]",
-  formeJuridique: "[FORME_JURIDIQUE]",
-  capital: "[CAPITAL]",
-  siren: "[SIREN]",
-  rcsVille: "[RCS_VILLE]",
-  adresse: "[ADRESSE]",
-  numTva: "[NUM_TVA]",
-  telephone: "[TELEPHONE]",
-  directeurPublication: "[DIRECTEUR_PUB]",
-  emailContact: "[EMAIL_CONTACT]",
-  emailRgpd: "[EMAIL_RGPD]",
+  // Entrepreneur individuel : pas de capital social, l'établissement principal tient lieu de siège.
+  nomSociete: "Bouyé Matthieu",
+  formeJuridique: "entrepreneur individuel (micro-entreprise)",
+  siren: "534 268 313",
+  siret: "534 268 313 00036",
+  rcsVille: "Bordeaux",
+  adresse: "12 rue Latesta, 33200 Bordeaux",
+  numTva: "non assujetti, article 293 B du code général des impôts",
+  telephone: "06 58 07 54 19",
+  directeurPublication: "Matthieu Bouyé",
+  emailContact: "contact@spotlocal.fr",
+  emailRgpd: "rgpd@spotlocal.fr",
   // Médiateur de la consommation (article L612-1 du Code de la consommation).
   mediateurNom: "[MEDIATEUR_NOM]",
   mediateurSite: "[MEDIATEUR_SITE]",
-  // Prix de l'Espace Pro : « hors taxes » ou « toutes taxes comprises ».
-  regimePrix: "[HT_OU_TTC]",
+  // Prix de l'Espace Pro : sans TVA facturée tant que l'éditeur n'y est pas assujetti.
+  regimePrix: "nets, TVA non applicable (article 293 B du code général des impôts)",
   dateMiseAJour: "[DATE_MISE_A_JOUR]",
 } as const;
 

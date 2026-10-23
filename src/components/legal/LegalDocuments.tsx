@@ -43,10 +43,9 @@ function P({ children }: { children: ReactNode }) {
 function Editeur() {
   return (
     <>
-      la société <V>{ID.nomSociete}</V>, <V>{ID.formeJuridique}</V> au capital de{" "}
-      <V>{ID.capital}</V> euros, immatriculée au Registre du commerce et des sociétés de{" "}
-      <V>{ID.rcsVille}</V> sous le numéro <V>{ID.siren}</V>, dont le siège social est situé{" "}
-      <V>{ID.adresse}</V>
+      <V>{ID.nomSociete}</V>, <V>{ID.formeJuridique}</V>, immatriculé au Registre du commerce et des
+      sociétés de <V>{ID.rcsVille}</V> sous le numéro <V>{ID.siren}</V> (SIRET <V>{ID.siret}</V>),
+      dont l'établissement principal est situé <V>{ID.adresse}</V>
     </>
   );
 }
@@ -80,10 +79,9 @@ export function MentionsLegales() {
           la «&nbsp;Plateforme&nbsp;»), est éditée par <Editeur />.
         </P>
         <P>
-          Le numéro d'identification intracommunautaire à la taxe sur la valeur ajoutée de la
-          société est le <V>{ID.numTva}</V>. La société peut être contactée par courrier
+          Taxe sur la valeur ajoutée : <V>{ID.numTva}</V>. L'éditeur peut être contacté par courrier
           électronique à l'adresse <V>{ID.emailContact}</V>, par téléphone au <V>{ID.telephone}</V>{" "}
-          ou par voie postale à l'adresse de son siège social.
+          ou par voie postale à l'adresse de son établissement principal.
         </P>
       </Art>
 
@@ -91,13 +89,13 @@ export function MentionsLegales() {
         <P>
           Le directeur de la publication de la Plateforme, au sens de l'article 93-2 de la loi n°
           82-652 du 29 juillet 1982 sur la communication audiovisuelle, est{" "}
-          <V>{ID.directeurPublication}</V>, en sa qualité de représentant légal de la société
-          éditrice. Il peut être joint à l'adresse électronique <V>{ID.emailContact}</V>.
+          <V>{ID.directeurPublication}</V>, en sa qualité d'entrepreneur individuel éditeur de la
+          Plateforme. Il peut être joint à l'adresse électronique <V>{ID.emailContact}</V>.
         </P>
         <P>
           Les contenus publiés par les commerçants, associations et collectivités territoriales
-          depuis leurs espaces respectifs le sont sous la seule responsabilité de leurs auteurs, la
-          société éditrice n'intervenant à leur égard qu'en qualité de fournisseur de services
+          depuis leurs espaces respectifs le sont sous la seule responsabilité de leurs auteurs,
+          l'éditeur n'intervenant à leur égard qu'en qualité de fournisseur de services
           d'hébergement dans les conditions précisées à l'article 5 ci-après.
         </P>
       </Art>
@@ -121,23 +119,23 @@ export function MentionsLegales() {
           La Plateforme, prise dans son ensemble comme dans chacun de ses éléments, et notamment sa
           structure, son architecture, ses bases de données, ses codes sources et objets, sa charte
           graphique, ses textes, la dénomination SpotLocal, son logotype et ses icônes, est la
-          propriété exclusive de la société éditrice ou fait l'objet d'une autorisation
-          d'utilisation à son profit. Ces éléments sont protégés par les dispositions du Code de la
-          propriété intellectuelle et par les conventions internationales applicables.
+          propriété exclusive de l'éditeur ou fait l'objet d'une autorisation d'utilisation à son
+          profit. Ces éléments sont protégés par les dispositions du Code de la propriété
+          intellectuelle et par les conventions internationales applicables.
         </P>
         <P>
           Toute reproduction, représentation, adaptation, traduction, extraction ou réutilisation,
           totale ou partielle, de tout ou partie de la Plateforme ou de son contenu, par quelque
-          procédé et sur quelque support que ce soit, sans l'autorisation préalable et écrite de la
-          société éditrice, est strictement interdite et constitue une contrefaçon sanctionnée par
-          les articles L. 335-2 et suivants du Code de la propriété intellectuelle, ainsi qu'une
+          procédé et sur quelque support que ce soit, sans l'autorisation préalable et écrite de
+          l'éditeur, est strictement interdite et constitue une contrefaçon sanctionnée par les
+          articles L. 335-2 et suivants du Code de la propriété intellectuelle, ainsi qu'une
           atteinte aux droits du producteur de bases de données au sens des articles L. 341-1 et
           suivants du même code.
         </P>
         <P>
           Les marques, logos, photographies et visuels des établissements référencés demeurent la
-          propriété de leurs titulaires respectifs, qui en ont concédé l'usage à la société éditrice
-          pour les seuls besoins de leur diffusion sur la Plateforme.
+          propriété de leurs titulaires respectifs, qui en ont concédé l'usage à l'éditeur pour les
+          seuls besoins de leur diffusion sur la Plateforme.
         </P>
       </Art>
 
@@ -145,11 +143,10 @@ export function MentionsLegales() {
         <P>
           En sa qualité de fournisseur de services d'hébergement au sens de l'article 6 du règlement
           (UE) 2022/2065 du 19 octobre 2022 relatif à un marché unique des services numériques et de
-          la loi n° 2004-575 du 21 juin 2004, la société éditrice ne saurait voir sa responsabilité
-          engagée du fait des informations stockées à la demande des utilisateurs si elle n'a pas
-          effectivement connaissance de leur caractère illicite ou si, dès le moment où elle en a eu
-          connaissance, elle a agi promptement pour retirer ces informations ou en rendre l'accès
-          impossible.
+          la loi n° 2004-575 du 21 juin 2004, l'éditeur ne saurait voir sa responsabilité engagée du
+          fait des informations stockées à la demande des utilisateurs s'il n'a pas effectivement
+          connaissance de leur caractère illicite ou si, dès le moment où il en a eu connaissance,
+          il a agi promptement pour retirer ces informations ou en rendre l'accès impossible.
         </P>
         <P>
           Toute personne souhaitant signaler un contenu qu'elle estime illicite peut adresser une
@@ -166,9 +163,9 @@ export function MentionsLegales() {
           d'emprisonnement et de 15 000 euros d'amende.
         </P>
         <P>
-          La société éditrice accuse réception de toute notification, l'examine dans les meilleurs
-          délais, de manière diligente et objective, et informe son auteur ainsi que l'utilisateur à
-          l'origine du contenu concerné de la décision prise et des voies de recours disponibles.
+          L'éditeur accuse réception de toute notification, l'examine dans les meilleurs délais, de
+          manière diligente et objective, et informe son auteur ainsi que l'utilisateur à l'origine
+          du contenu concerné de la décision prise et des voies de recours disponibles.
         </P>
       </Art>
 
@@ -177,7 +174,7 @@ export function MentionsLegales() {
           En application des articles 11 et 12 du règlement (UE) 2022/2065, le point de contact
           unique permettant aux autorités des États membres, à la Commission européenne, au comité
           européen des services numériques ainsi qu'aux destinataires du service de communiquer
-          directement et rapidement avec la société éditrice est l'adresse électronique{" "}
+          directement et rapidement avec l'éditeur est l'adresse électronique{" "}
           <V>{ID.emailContact}</V>. Les communications peuvent être adressées en langue française ou
           en langue anglaise.
         </P>
@@ -185,9 +182,9 @@ export function MentionsLegales() {
 
       <Art n="7" title="Données personnelles">
         <P>
-          Les conditions dans lesquelles la société éditrice collecte et traite les données à
-          caractère personnel des utilisateurs, ainsi que les modalités d'exercice des droits dont
-          ceux-ci disposent, sont décrites dans la politique de confidentialité figurant au sein des
+          Les conditions dans lesquelles l'éditeur collecte et traite les données à caractère
+          personnel des utilisateurs, ainsi que les modalités d'exercice des droits dont ceux-ci
+          disposent, sont décrites dans la politique de confidentialité figurant au sein des
           conditions générales d'utilisation applicables aux particuliers. Toute demande relative à
           la protection des données personnelles peut être adressée à l'adresse{" "}
           <V>{ID.emailRgpd}</V>.
@@ -648,13 +645,13 @@ export function CguParticuliers() {
           </P>
           <P>
             Ces droits s'exercent par courrier électronique adressé à l'adresse{" "}
-            <V>{ID.emailRgpd}</V> ou par courrier postal adressé au siège social de SpotLocal,{" "}
-            <V>{ID.adresse}</V>, en précisant l'objet de la demande et l'adresse électronique
-            associée au Compte le cas échéant. En cas de doute raisonnable sur l'identité du
-            demandeur, SpotLocal peut solliciter les informations complémentaires strictement
-            nécessaires à la confirmation de celle-ci, conformément à l'article 12, 6 du RGPD.
-            SpotLocal répond à la demande dans un délai d'un mois à compter de sa réception, ce
-            délai pouvant être prolongé de deux mois compte tenu de la complexité ou du nombre de
+            <V>{ID.emailRgpd}</V> ou par courrier postal adressé à l'établissement principal de
+            SpotLocal, <V>{ID.adresse}</V>, en précisant l'objet de la demande et l'adresse
+            électronique associée au Compte le cas échéant. En cas de doute raisonnable sur
+            l'identité du demandeur, SpotLocal peut solliciter les informations complémentaires
+            strictement nécessaires à la confirmation de celle-ci, conformément à l'article 12, 6 du
+            RGPD. SpotLocal répond à la demande dans un délai d'un mois à compter de sa réception,
+            ce délai pouvant être prolongé de deux mois compte tenu de la complexité ou du nombre de
             demandes, auquel cas l'Utilisateur en est informé dans le délai initial d'un mois.
           </P>
           <P>
@@ -695,13 +692,12 @@ export function CgvPro() {
     <>
       <P>
         Les présentes conditions générales de vente et d'utilisation de l'Espace Pro (ci-après les
-        «&nbsp;Conditions&nbsp;») régissent les relations contractuelles entre <Editeur />, numéro
-        de TVA intracommunautaire <V>{ID.numTva}</V> (ci-après «&nbsp;SpotLocal&nbsp;»), et toute
-        personne morale ou physique agissant à des fins professionnelles, ou toute association ou
-        organisme, qui crée un compte au sein de l'Espace Pro de la plateforme SpotLocal et y
-        référence un établissement (ci-après le «&nbsp;Commerçant&nbsp;»). SpotLocal et le
-        Commerçant sont ci-après désignés ensemble les «&nbsp;Parties&nbsp;» et individuellement une
-        «&nbsp;Partie&nbsp;».
+        «&nbsp;Conditions&nbsp;») régissent les relations contractuelles entre <Editeur />, TVA :{" "}
+        <V>{ID.numTva}</V> (ci-après «&nbsp;SpotLocal&nbsp;»), et toute personne morale ou physique
+        agissant à des fins professionnelles, ou toute association ou organisme, qui crée un compte
+        au sein de l'Espace Pro de la plateforme SpotLocal et y référence un établissement (ci-après
+        le «&nbsp;Commerçant&nbsp;»). SpotLocal et le Commerçant sont ci-après désignés ensemble les
+        «&nbsp;Parties&nbsp;» et individuellement une «&nbsp;Partie&nbsp;».
       </P>
 
       <Art n="1" title="Définitions">
