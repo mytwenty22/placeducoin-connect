@@ -21,7 +21,7 @@ export const LEGAL_IDENTITY = {
   mediateurSite: "[MEDIATEUR_SITE]",
   // Prix de l'Espace Pro : sans TVA facturée tant que l'éditeur n'y est pas assujetti.
   regimePrix: "nets, TVA non applicable (article 293 B du code général des impôts)",
-  dateMiseAJour: "[DATE_MISE_A_JOUR]",
+  dateMiseAJour: "23 octobre 2026",
 } as const;
 
 // Version des CGU/CGV Espace Pro enregistrée avec chaque acceptation : à changer à chaque
