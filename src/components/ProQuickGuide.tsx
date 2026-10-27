@@ -12,7 +12,7 @@ import {
   Zap,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { PRO_TUTORIAL_VIDEOS, toVideoEmbedUrl } from "@/lib/video-embed";
+import { DEMO_VIDEOS, DemoVideos } from "@/components/DemoVideos";
 
 type GuideCommerce = {
   id: string;
@@ -96,10 +96,6 @@ export function ProQuickGuide({
     }
   }
 
-  const videos = PRO_TUTORIAL_VIDEOS.flatMap(({ title, url }) => {
-    const embedUrl = toVideoEmbedUrl(url);
-    return embedUrl ? [{ title, embedUrl }] : [];
-  });
   const doneCount = Number(profileDone) + Number(publishDone);
   const announce = isAssociation ? "votre premier événement" : "votre première offre";
 
@@ -155,24 +151,8 @@ export function ProQuickGuide({
 
       {!isCollapsed ? (
         <div className="grid gap-4 border-t border-border p-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-          {videos.length > 0 ? (
-            <div className="grid grid-cols-2 gap-3">
-              {videos.map((video) => (
-                <div
-                  key={video.embedUrl}
-                  className="aspect-[9/16] overflow-hidden rounded-xl bg-gradient-navy shadow-md"
-                >
-                  <iframe
-                    src={video.embedUrl}
-                    title={video.title}
-                    loading="lazy"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                    allowFullScreen
-                    className="h-full w-full border-0"
-                  />
-                </div>
-              ))}
-            </div>
+          {DEMO_VIDEOS.length > 0 ? (
+            <DemoVideos />
           ) : (
             <div className="aspect-video overflow-hidden rounded-xl bg-gradient-navy">
               <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center text-primary-foreground">
