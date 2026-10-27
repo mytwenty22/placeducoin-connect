@@ -7,6 +7,7 @@ import { ActivateOfferButton } from "@/components/ActivateOfferButton";
 import { FavoriteButton } from "@/components/FavoriteButton";
 import { FeaturedEventBlock } from "@/components/FeaturedEventBlock";
 import { InstallAppBanner } from "@/components/InstallAppBanner";
+import { PosterClientDemoCard } from "@/components/ClientDemoCard";
 import { supabase } from "@/lib/supabase";
 import { computeOpenStatus, type Horaire } from "@/lib/horaires";
 import { getReadableTextColor } from "@/lib/color";
@@ -391,6 +392,9 @@ function StandaloneSite() {
                 </div>
               </section>
             ) : null}
+
+            {/* Visiteurs arrivés via le QR code de l'affiche vitrine : la vidéo client. */}
+            <PosterClientDemoCard />
 
             {/* Présentation */}
             {commerce.description ? (

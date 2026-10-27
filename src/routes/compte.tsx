@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Flame, Heart, HeartOff, LogOut, User } from "lucide-react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
+import { ClientDemoCard } from "@/components/ClientDemoCard";
 import { EmailPasswordLogin } from "@/components/EmailPasswordLogin";
 import { useSession } from "@/hooks/use-session";
 import { useToggleFavorite } from "@/hooks/use-favorites";
@@ -89,6 +90,9 @@ function ClientAuthGate() {
           Espace Pro
         </Link>
       </p>
+      <div className="mx-auto max-w-xl pt-5">
+        <ClientDemoCard />
+      </div>
     </div>
   );
 }

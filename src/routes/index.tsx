@@ -2,7 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Search, MapPin, Megaphone, Building2, Map as MapIcon, PlayCircle, X } from "lucide-react";
-import { DemoVideos, DEMO_VIDEOS } from "@/components/DemoVideos";
+import { DemoVideos } from "@/components/DemoVideos";
+import { embeddableVideos, HOME_DEMO_VIDEOS } from "@/lib/video-embed";
 import { AppHeader } from "@/components/AppHeader";
 import { CitySelect } from "@/components/CitySelect";
 import { useSelectedVille } from "@/hooks/use-villes";
@@ -936,7 +937,7 @@ function Marketplace() {
         </div>
       </section>
 
-      {DEMO_VIDEOS.length > 0 ? (
+      {embeddableVideos(HOME_DEMO_VIDEOS).length > 0 ? (
         <section className="border-t border-border/60 py-10" aria-labelledby="demo-videos-title">
           <div className="mx-auto max-w-2xl px-4">
             <div className="flex min-w-0 items-center gap-2">
@@ -948,7 +949,7 @@ function Marketplace() {
                 SpotLocal en vidéo
               </h2>
             </div>
-            <DemoVideos className="mt-4 sm:gap-5" />
+            <DemoVideos videos={HOME_DEMO_VIDEOS} className="mt-4 sm:gap-5" />
           </div>
         </section>
       ) : null}

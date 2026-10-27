@@ -1,9 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { PRO_TUTORIAL_VIDEOS, toVideoEmbedUrl } from "../src/lib/video-embed";
+import {
+  CLIENT_DEMO_VIDEO,
+  HOME_DEMO_VIDEOS,
+  PRO_DEMO_VIDEO,
+  toVideoEmbedUrl,
+} from "../src/lib/video-embed";
 
-describe("PRO_TUTORIAL_VIDEOS", () => {
-  it("ne contient que des liens intégrables", () => {
-    for (const { url } of PRO_TUTORIAL_VIDEOS) expect(toVideoEmbedUrl(url)).not.toBeNull();
+describe("vidéos de démonstration", () => {
+  it("ne contiennent que des liens intégrables", () => {
+    for (const { url } of [PRO_DEMO_VIDEO, CLIENT_DEMO_VIDEO, ...HOME_DEMO_VIDEOS]) {
+      expect(toVideoEmbedUrl(url)).not.toBeNull();
+    }
   });
 });
 

@@ -12,7 +12,8 @@ import {
   Zap,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { DEMO_VIDEOS, DemoVideos } from "@/components/DemoVideos";
+import { DemoVideos } from "@/components/DemoVideos";
+import { embeddableVideos, PRO_DEMO_VIDEO } from "@/lib/video-embed";
 
 type GuideCommerce = {
   id: string;
@@ -151,8 +152,8 @@ export function ProQuickGuide({
 
       {!isCollapsed ? (
         <div className="grid gap-4 border-t border-border p-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-          {DEMO_VIDEOS.length > 0 ? (
-            <DemoVideos />
+          {embeddableVideos([PRO_DEMO_VIDEO]).length > 0 ? (
+            <DemoVideos videos={[PRO_DEMO_VIDEO]} className="w-full" />
           ) : (
             <div className="aspect-video overflow-hidden rounded-xl bg-gradient-navy">
               <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center text-primary-foreground">

@@ -1,12 +1,21 @@
+export type DemoVideo = { title: string; url: string };
+
 /**
- * Vidéos tutoriel (format vertical 9:16) affichées côte à côte dans le guide rapide de l'espace
- * Pro. Coller ici des liens YouTube ou Vimeo (lien de partage ou de la barre d'adresse) ; liste
- * vide = emplacement "bientôt disponible".
+ * Vidéos de démonstration (format vertical 9:16). Coller un lien YouTube ou Vimeo (lien de
+ * partage ou de la barre d'adresse). La vidéo commerçant passe dans le guide rapide de l'espace
+ * Pro, la vidéo client sur /compte et sur la fiche ouverte via le QR code de l'affiche vitrine.
  */
-export const PRO_TUTORIAL_VIDEOS: { title: string; url: string }[] = [
-  { title: "SpotLocal Démo 1", url: "https://www.youtube.com/shorts/5xYUUT17UNw" },
-  { title: "SpotLocal Démo 2", url: "https://www.youtube.com/shorts/cLIAJbTK_DU" },
-];
+export const PRO_DEMO_VIDEO: DemoVideo = {
+  title: "Espace Pro : utilisation",
+  url: "https://www.youtube.com/shorts/5xYUUT17UNw",
+};
+export const CLIENT_DEMO_VIDEO: DemoVideo = {
+  title: "Première connexion client",
+  url: "https://www.youtube.com/shorts/cLIAJbTK_DU",
+};
+
+/** Vidéos de la section "SpotLocal en vidéo" de l'accueil. */
+export const HOME_DEMO_VIDEOS: DemoVideo[] = [PRO_DEMO_VIDEO, CLIENT_DEMO_VIDEO];
 
 /** Lien YouTube / Vimeo -> URL d'intégration (iframe), ou null si le lien n'est pas reconnu. */
 export function toVideoEmbedUrl(url: string): string | null {
@@ -35,4 +44,12 @@ export function toVideoEmbedUrl(url: string): string | null {
     if (id) return `https://player.vimeo.com/video/${id}?dnt=1`;
   }
   return null;
+}
+
+/** Vidéos intégrables de la liste (liens non reconnus écartés). */
+export function embeddableVideos(videos: DemoVideo[]) {
+  return videos.flatMap(({ title, url }) => {
+    const embedUrl = toVideoEmbedUrl(url);
+    return embedUrl ? [{ title, embedUrl }] : [];
+  });
 }

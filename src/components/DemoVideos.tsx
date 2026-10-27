@@ -1,16 +1,23 @@
-import { PRO_TUTORIAL_VIDEOS, toVideoEmbedUrl } from "@/lib/video-embed";
+import { embeddableVideos, type DemoVideo } from "@/lib/video-embed";
 
-/** Vidéos de démonstration intégrables (liens non reconnus écartés). */
-export const DEMO_VIDEOS = PRO_TUTORIAL_VIDEOS.flatMap(({ title, url }) => {
-  const embedUrl = toVideoEmbedUrl(url);
-  return embedUrl ? [{ title, embedUrl }] : [];
-});
+/**
+ * Vidéos de démonstration SpotLocal en format vertical 9:16 : côte à côte s'il y en a plusieurs,
+ * centrée et de largeur limitée s'il n'y en a qu'une.
+ */
+export function DemoVideos({
+  videos,
+  className = "",
+}: {
+  videos: DemoVideo[];
+  className?: string;
+}) {
+  const items = embeddableVideos(videos);
+  if (items.length === 0) return null;
+  const layout = items.length > 1 ? "grid-cols-2" : "mx-auto max-w-[260px] grid-cols-1";
 
-/** Vidéos de démonstration SpotLocal en format vertical 9:16, côte à côte. */
-export function DemoVideos({ className = "" }: { className?: string }) {
   return (
-    <div className={`grid grid-cols-2 gap-3 ${className}`}>
-      {DEMO_VIDEOS.map((video) => (
+    <div className={`grid gap-3 ${layout} ${className}`}>
+      {items.map((video) => (
         <div
           key={video.embedUrl}
           className="aspect-[9/16] overflow-hidden rounded-xl bg-gradient-navy shadow-md"

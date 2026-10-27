@@ -8,6 +8,7 @@ import { ActivateOfferButton } from "@/components/ActivateOfferButton";
 import { FavoriteButton } from "@/components/FavoriteButton";
 import { FeaturedEventBlock } from "@/components/FeaturedEventBlock";
 import { InstallAppBanner } from "@/components/InstallAppBanner";
+import { PosterClientDemoCard } from "@/components/ClientDemoCard";
 import { getOffer, type CategoryKey, type Offer, type PromoItem } from "@/lib/placeducoin-data";
 import { validateOfferSearch } from "@/lib/offer-search";
 import { supabase } from "@/lib/supabase";
@@ -412,6 +413,11 @@ function ShopSite() {
             hasLocation={offer.hasLocation === true}
           />
         ) : null}
+
+        {/* Visiteurs arrivés via le QR code de l'affiche vitrine : la vidéo client. */}
+        <div className="mx-auto mt-8 max-w-2xl empty:hidden">
+          <PosterClientDemoCard />
+        </div>
 
         <section className="mt-8">
           <h2 className="font-display text-xl font-extrabold text-foreground">Galerie</h2>
