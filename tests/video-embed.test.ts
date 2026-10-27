@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { toVideoEmbedUrl } from "../src/lib/video-embed";
+import { PRO_TUTORIAL_VIDEOS, toVideoEmbedUrl } from "../src/lib/video-embed";
+
+describe("PRO_TUTORIAL_VIDEOS", () => {
+  it("ne contient que des liens intégrables", () => {
+    for (const { url } of PRO_TUTORIAL_VIDEOS) expect(toVideoEmbedUrl(url)).not.toBeNull();
+  });
+});
 
 describe("toVideoEmbedUrl", () => {
   it("convertit les liens YouTube", () => {

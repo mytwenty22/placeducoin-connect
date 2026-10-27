@@ -1,8 +1,12 @@
 /**
- * Vidéo tutoriel affichée dans le guide rapide de l'espace Pro. Coller ici un lien YouTube ou
- * Vimeo (lien de partage ou de la barre d'adresse) ; vide = emplacement "bientôt disponible".
+ * Vidéos tutoriel (format vertical 9:16) affichées côte à côte dans le guide rapide de l'espace
+ * Pro. Coller ici des liens YouTube ou Vimeo (lien de partage ou de la barre d'adresse) ; liste
+ * vide = emplacement "bientôt disponible".
  */
-export const PRO_TUTORIAL_VIDEO_URL = "";
+export const PRO_TUTORIAL_VIDEOS: { title: string; url: string }[] = [
+  { title: "SpotLocal Démo 1", url: "https://www.youtube.com/shorts/5xYUUT17UNw" },
+  { title: "SpotLocal Démo 2", url: "https://www.youtube.com/shorts/cLIAJbTK_DU" },
+];
 
 /** Lien YouTube / Vimeo -> URL d'intégration (iframe), ou null si le lien n'est pas reconnu. */
 export function toVideoEmbedUrl(url: string): string | null {
