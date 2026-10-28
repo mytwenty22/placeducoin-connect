@@ -29,8 +29,7 @@ import { PosterClientDemoCard } from "@/components/ClientDemoCard";
 import { supabase } from "@/lib/supabase";
 import { computeOpenStatus, type Horaire } from "@/lib/horaires";
 import type { Prestation } from "@/lib/prestations";
-import { getReadableTextColor } from "@/lib/color";
-import { THEME_STYLES, type ThemeVisuel } from "@/lib/site-theme";
+import { PRO_CHARTE } from "@/lib/site-theme";
 import { logStatEvent, isFromGoogleReferrer } from "@/lib/stats-tracking";
 import { validateOfferSearch } from "@/lib/offer-search";
 import { LEGAL_DOCS } from "@/lib/legal";
@@ -50,7 +49,6 @@ type SiteCommerce = {
   instagram: string | null;
   galerie_urls: string[];
   video_url: string | null;
-  theme_visuel: ThemeVisuel;
   site_actif: boolean;
   google_rating: number | null;
   google_review_count: number | null;
@@ -94,7 +92,7 @@ export const Route = createFileRoute("/site/$slug")({
     const { data: commerce } = await supabase
       .from("commerces")
       .select(
-        "id, slug, nom, trade, adresse, telephone, photo_url, logo_url, description, horaires, prestations, instagram, galerie_urls, video_url, theme_visuel, site_actif, google_rating, google_review_count, latitude, longitude",
+        "id, slug, nom, trade, adresse, telephone, photo_url, logo_url, description, horaires, prestations, instagram, galerie_urls, video_url, site_actif, google_rating, google_review_count, latitude, longitude",
       )
       .eq("slug", params.slug)
       .maybeSingle();
@@ -333,25 +331,16 @@ function StandaloneSite() {
     );
   }
 
-  const theme = THEME_STYLES[commerce.theme_visuel];
   const phoneHref = commerce.telephone ? `tel:${commerce.telephone.replace(/\s/g, "")}` : null;
   const mapsHref = commerce.adresse
     ? `https://maps.google.com/?q=${encodeURIComponent(commerce.adresse)}`
     : null;
   const openStatus = computeOpenStatus(commerce.horaires);
-  // Fond de bannière fixe et sobre : la couleur de marque du thème ne sert
-  // plus qu'à teinter les boutons d'action (Appeler / Itinéraire).
-  const callButtonTextColor = getReadableTextColor(theme.bandColor);
-  const cardClass = "rounded-2xl border border-slate-200 bg-white shadow-md";
-  const headingClass = "text-slate-900";
-  const mutedClass = "text-slate-500";
-  const dividerClass = "border-slate-200";
-  // Fond de page très doux (#f8fafc) ou sombre pour les thèmes sombres : les
-  // sections restent toujours en blanc pur pour un bon contraste.
-  const pageBgClass = theme.isDark ? "bg-slate-950" : "bg-slate-50";
+  // Charte unique, la même pour tous les Site Pro (src/lib/site-theme.ts).
+  const { cardClass, heading: headingClass, muted: mutedClass, divider: dividerClass } = PRO_CHARTE;
 
   return (
-    <div className={`flex min-h-screen flex-col ${pageBgClass}`}>
+    <div className={`flex min-h-screen flex-col ${PRO_CHARTE.pageBg}`}>
       <div
         className="fixed left-3 z-50"
         style={{ top: "calc(env(safe-area-inset-top, 0px) + 0.75rem)" }}
@@ -379,7 +368,7 @@ function StandaloneSite() {
             Sur desktop avec photo, elle devient transparente et flotte en bas du hero. */}
         <div
           className={`relative px-6 py-10 text-center text-white lg:flex lg:min-h-[320px] lg:flex-col lg:items-center lg:justify-end lg:px-10 lg:py-10 ${
-            commerce.photo_url ? "bg-[#1e293b] lg:bg-transparent" : "bg-[#1e293b]"
+            commerce.photo_url ? `${PRO_CHARTE.headerBg} lg:bg-transparent` : PRO_CHARTE.headerBg
           }`}
         >
           {commerce.logo_url ? (
@@ -437,8 +426,7 @@ function StandaloneSite() {
             {phoneHref ? (
               <a
                 href={phoneHref}
-                style={{ backgroundColor: theme.bandColor, color: callButtonTextColor }}
-                className="inline-flex items-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-bold shadow-lift transition-transform hover:scale-[1.03]"
+                className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-bold shadow-lift transition-transform hover:scale-[1.03] ${PRO_CHARTE.primaryButton}`}
               >
                 <Phone className="h-4 w-4" /> Appeler
               </a>
@@ -448,15 +436,14 @@ function StandaloneSite() {
                 href={mapsHref}
                 target="_blank"
                 rel="noreferrer"
-                style={{ borderColor: theme.bandColor }}
-                className="inline-flex items-center gap-1.5 rounded-full border-2 bg-white/5 px-4 py-2.5 text-sm font-bold text-white backdrop-blur-sm transition-colors hover:bg-white/10"
+                className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-bold backdrop-blur-sm transition-colors ${PRO_CHARTE.headerButton}`}
               >
                 <Navigation className="h-4 w-4" /> Itinéraire
               </a>
             ) : null}
             <FavoriteButton
               commerceId={commerce.id}
-              className="border-2 border-white/30 bg-white/5 rounded-full font-bold text-white backdrop-blur-sm hover:bg-white/10"
+              className={`rounded-full font-bold backdrop-blur-sm ${PRO_CHARTE.headerButton}`}
             />
           </div>
         </div>
@@ -636,7 +623,7 @@ function StandaloneSite() {
           {/* Bloc ancré (sticky) : itinéraire, horaires et coordonnées */}
           <div className="space-y-6 lg:sticky lg:top-6 lg:col-span-1">
             {commerce.adresse ? (
-              <section className={`${cardClass} overflow-hidden !shadow-xl`}>
+              <section className={`${cardClass} overflow-hidden`}>
                 <iframe
                   src={`https://www.google.com/maps?q=${encodeURIComponent(commerce.adresse)}&output=embed`}
                   className="h-48 w-full border-0"
@@ -648,7 +635,7 @@ function StandaloneSite() {
             ) : null}
 
             {/* Horaires & coordonnées */}
-            <section className={`${cardClass} space-y-4 p-5 !shadow-xl`}>
+            <section className={`${cardClass} space-y-4 p-5`}>
               <h2 className={`font-display text-lg font-extrabold ${headingClass}`}>
                 Horaires & Coordonnées
               </h2>

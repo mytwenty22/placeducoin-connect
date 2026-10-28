@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import type { CommerceListing, PromoItem } from "@/lib/placeducoin-data";
 import { computeOpenStatus } from "@/lib/horaires";
-import { THEME_STYLES, DEFAULT_THEME } from "@/lib/site-theme";
+import { PRO_CHARTE } from "@/lib/site-theme";
 import { GoogleRatingStars } from "@/components/GoogleRatingStars";
 import { logOfferViewOnce } from "@/lib/stats-tracking";
 
@@ -54,7 +54,8 @@ export function OfferCard({ commerce }: { commerce: CommerceListing }) {
   const cardRef = useRef<HTMLElement>(null);
 
   const openStatus = computeOpenStatus(commerce.horaires ?? []);
-  const styles = THEME_STYLES[commerce.themeVisuel ?? DEFAULT_THEME];
+  // Même charte pour toutes les cartes (src/lib/site-theme.ts).
+  const styles = PRO_CHARTE;
   const promos = commerce.promos;
   const hasPromos = promos.length > 0;
   const current = hasPromos ? (promos[activeIndex % promos.length] ?? promos[0]) : undefined;
@@ -226,11 +227,7 @@ export function OfferCard({ commerce }: { commerce: CommerceListing }) {
                   {current.priceNow === 0 ? "Offert" : `${current.priceNow.toFixed(2)} €`}
                 </span>
               ) : null}
-              <span
-                className={`ml-auto inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold ${
-                  styles.isDark ? "bg-white/10 text-white" : "bg-secondary text-navy"
-                }`}
-              >
+              <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-1 text-xs font-semibold text-navy">
                 {isEvent ? (
                   <>
                     <CalendarDays className="h-3.5 w-3.5" />

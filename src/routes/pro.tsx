@@ -52,8 +52,7 @@ import {
 import { CATEGORIES, type CategoryKey, type CommerceListing } from "@/lib/placeducoin-data";
 import type { Horaire } from "@/lib/horaires";
 import { cleanPrestations, type Prestation } from "@/lib/prestations";
-import { THEME_OPTIONS, THEME_STYLES, type ThemeVisuel } from "@/lib/site-theme";
-import { getReadableTextColor } from "@/lib/color";
+import { PRO_CHARTE } from "@/lib/site-theme";
 import { isBoostActive } from "@/lib/boost";
 import {
   canCompanyPay,
@@ -132,7 +131,6 @@ type Commerce = {
   instagram: string | null;
   galerie_urls: string[];
   video_url: string | null;
-  theme_visuel: ThemeVisuel;
   site_actif: boolean;
   boost_actif: boolean;
   boost_expires_at: string | null;
@@ -497,7 +495,7 @@ function ProDashboard({ userId }: { userId: string }) {
       const { data, error } = await supabase
         .from("commerces")
         .select(
-          "id, slug, nom, trade, category, ville_id, quartier_id, adresse, code_postal, latitude, longitude, telephone, photo_url, logo_url, description, horaires, prestations, instagram, galerie_urls, video_url, theme_visuel, site_actif, boost_actif, boost_expires_at, suspended_at, suspension_reason",
+          "id, slug, nom, trade, category, ville_id, quartier_id, adresse, code_postal, latitude, longitude, telephone, photo_url, logo_url, description, horaires, prestations, instagram, galerie_urls, video_url, site_actif, boost_actif, boost_expires_at, suspended_at, suspension_reason",
         )
         .eq("owner_id", userId)
         .maybeSingle();
@@ -1133,7 +1131,6 @@ function ProfileScreen({
   const [telephone, setTelephone] = useState(commerce.telephone ?? "");
   const [photoUrl, setPhotoUrl] = useState(commerce.photo_url ?? "");
   const [logoUrl, setLogoUrl] = useState(commerce.logo_url ?? "");
-  const [themeVisuel, setThemeVisuel] = useState<ThemeVisuel>(commerce.theme_visuel);
   const [description, setDescription] = useState(commerce.description ?? "");
   const [instagram, setInstagram] = useState(commerce.instagram ?? "");
   const [galerieUrls, setGalerieUrls] = useState<string[]>(commerce.galerie_urls);
@@ -1328,7 +1325,6 @@ function ProfileScreen({
               description: description || null,
               instagram: instagram || null,
               video_url: videoUrl || null,
-              theme_visuel: themeVisuel,
             })
             .eq("id", commerce.id);
           setPending(false);
@@ -1494,38 +1490,10 @@ function ProfileScreen({
 
         <div className="block">
           <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Style du site
-          </span>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            {THEME_OPTIONS.map((t) => (
-              <button
-                key={t.key}
-                type="button"
-                onClick={() => setThemeVisuel(t.key)}
-                className={`rounded-xl border px-3 py-2.5 text-left text-xs font-semibold transition-colors ${
-                  themeVisuel === t.key
-                    ? "border-navy bg-navy text-primary-foreground"
-                    : "border-input bg-card text-foreground hover:bg-secondary"
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="block">
-          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Aperçu du site
           </span>
           <div className="mt-2 overflow-hidden rounded-xl border border-border">
-            <div
-              className="px-4 py-6 text-center"
-              style={{
-                backgroundColor: THEME_STYLES[themeVisuel].bandColor,
-                color: getReadableTextColor(THEME_STYLES[themeVisuel].bandColor),
-              }}
-            >
+            <div className={`px-4 py-6 text-center text-white ${PRO_CHARTE.headerBg}`}>
               {logoUrl ? (
                 <img
                   src={logoUrl}
@@ -1564,7 +1532,6 @@ function ProfileScreen({
                 ...(photoUrl ? { photoUrl } : {}),
                 ...(logoUrl ? { logoUrl } : {}),
                 horaires: commerce.horaires,
-                themeVisuel,
                 ...(description ? { description } : {}),
                 promos: [],
               }}
@@ -2171,7 +2138,6 @@ function PromoScreen({
                 ...(commerce.photo_url ? { photoUrl: commerce.photo_url } : {}),
                 ...(commerce.logo_url ? { logoUrl: commerce.logo_url } : {}),
                 horaires: commerce.horaires,
-                themeVisuel: commerce.theme_visuel,
                 ...(commerce.description ? { description: commerce.description } : {}),
                 promos: [
                   {
