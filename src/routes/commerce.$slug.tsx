@@ -20,7 +20,7 @@ async function loadRealOffer(slug: string): Promise<Offer | null> {
   const { data: commerce } = await supabase
     .from("commerces")
     .select(
-      "id, nom, trade, category, adresse, telephone, photo_url, site_actif, google_rating, google_review_count, horaires, prestations, galerie_urls, latitude, longitude, villes(nom)",
+      "id, nom, trade, category, adresse, telephone, photo_url, description, site_actif, google_rating, google_review_count, horaires, prestations, galerie_urls, latitude, longitude, villes(nom)",
     )
     .eq("slug", slug)
     .maybeSingle();
@@ -93,6 +93,7 @@ async function loadRealOffer(slug: string): Promise<Offer | null> {
     })),
     galleryUrls: (commerce.galerie_urls as string[] | null) ?? [],
     premium: commerce.site_actif,
+    ...(commerce.description?.trim() ? { description: commerce.description.trim() } : {}),
     ...(photoUrl ? { photoUrl } : {}),
     ...(commerce.google_rating != null ? { googleRating: commerce.google_rating } : {}),
     googleReviewCount: commerce.google_review_count,
@@ -366,6 +367,12 @@ function ShopSite() {
         <div className="mx-auto max-w-5xl px-4">
           <h1 className="font-display text-3xl font-extrabold sm:text-4xl">{offer.shop}</h1>
           <p className="mt-1 text-primary-foreground/80">{offer.trade}</p>
+          {/* Présentation saisie dans l'Espace Pro (Mon profil → Présentation). */}
+          {offer.description ? (
+            <p className="mt-3 max-w-2xl whitespace-pre-line text-sm leading-relaxed text-primary-foreground/90">
+              {offer.description}
+            </p>
+          ) : null}
           <GoogleRatingStars
             rating={offer.googleRating}
             reviewCount={offer.googleReviewCount}

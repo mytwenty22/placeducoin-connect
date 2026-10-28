@@ -174,6 +174,11 @@ export function OfferCard({ commerce }: { commerce: CommerceListing }) {
           <div className="min-w-0">
             <h3 className={`truncate text-base font-bold ${styles.heading}`}>{commerce.shop}</h3>
             <p className={`truncate text-xs ${styles.muted}`}>{commerce.trade}</p>
+            {commerce.description ? (
+              <p className={`mt-1 line-clamp-2 text-xs leading-snug ${styles.muted}`}>
+                {commerce.description}
+              </p>
+            ) : null}
             <GoogleRatingStars
               rating={commerce.googleRating}
               reviewCount={commerce.googleReviewCount}
@@ -255,7 +260,7 @@ export function OfferCard({ commerce }: { commerce: CommerceListing }) {
           </>
         ) : (
           <p className={`text-sm leading-snug ${styles.muted}`}>
-            {commerce.description || "Aucune offre en cours — consultez la fiche du commerce."}
+            Aucune offre en cours — consultez la fiche du commerce.
           </p>
         )}
 
