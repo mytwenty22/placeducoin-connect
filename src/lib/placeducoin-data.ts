@@ -54,6 +54,7 @@ export type Offer = {
   phone: string;
   hours: { day: string; value: string }[];
   services: { name: string; price: string }[];
+  galleryUrls?: string[];
   premium?: boolean;
   commerceId?: string;
   promoId?: string;

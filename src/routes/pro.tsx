@@ -44,6 +44,7 @@ import { slugify } from "@/lib/slugify";
 import { parseCsv } from "@/lib/csv";
 import { CATEGORIES, type CategoryKey, type CommerceListing } from "@/lib/placeducoin-data";
 import type { Horaire } from "@/lib/horaires";
+import { cleanPrestations, type Prestation } from "@/lib/prestations";
 import { THEME_OPTIONS, THEME_STYLES, type ThemeVisuel } from "@/lib/site-theme";
 import { getReadableTextColor } from "@/lib/color";
 import { isBoostActive } from "@/lib/boost";
@@ -114,6 +115,7 @@ type Commerce = {
   logo_url: string | null;
   description: string | null;
   horaires: Horaire[];
+  prestations: Prestation[];
   instagram: string | null;
   galerie_urls: string[];
   video_url: string | null;
@@ -472,7 +474,7 @@ function ProDashboard({ userId }: { userId: string }) {
       const { data, error } = await supabase
         .from("commerces")
         .select(
-          "id, slug, nom, trade, category, ville_id, quartier_id, adresse, code_postal, latitude, longitude, telephone, photo_url, logo_url, description, horaires, instagram, galerie_urls, video_url, theme_visuel, site_actif, boost_actif, boost_expires_at, suspended_at, suspension_reason",
+          "id, slug, nom, trade, category, ville_id, quartier_id, adresse, code_postal, latitude, longitude, telephone, photo_url, logo_url, description, horaires, prestations, instagram, galerie_urls, video_url, theme_visuel, site_actif, boost_actif, boost_expires_at, suspended_at, suspension_reason",
         )
         .eq("owner_id", userId)
         .maybeSingle();
@@ -1108,7 +1110,6 @@ function ProfileScreen({
   const [logoUrl, setLogoUrl] = useState(commerce.logo_url ?? "");
   const [themeVisuel, setThemeVisuel] = useState<ThemeVisuel>(commerce.theme_visuel);
   const [description, setDescription] = useState(commerce.description ?? "");
-  const [horaires, setHoraires] = useState<Horaire[]>(commerce.horaires);
   const [instagram, setInstagram] = useState(commerce.instagram ?? "");
   const [galerieUrls, setGalerieUrls] = useState<string[]>(commerce.galerie_urls);
   const [galerieUrlInput, setGalerieUrlInput] = useState("");
@@ -1138,24 +1139,35 @@ function ProfileScreen({
     onUpdated();
   }
 
-  function updateHoraire(index: number, field: keyof Horaire, value: string) {
-    setHoraires((prev) => prev.map((h, i) => (i === index ? { ...h, [field]: value } : h)));
-  }
-  function addHoraire() {
-    setHoraires((prev) => [...prev, { jour: "", valeur: "" }]);
-  }
-  function removeHoraire(index: number) {
-    setHoraires((prev) => prev.filter((_, i) => i !== index));
+  // La galerie est enregistrée dès chaque ajout ou retrait : une photo téléversée mais restée en
+  // attente du bouton « Enregistrer » (en bas du formulaire) n'apparaissait jamais sur la vitrine.
+  async function saveGalerie(next: string[]) {
+    const { error } = await supabase
+      .from("commerces")
+      .update({ galerie_urls: next })
+      .eq("id", commerce.id);
+    if (error) throw new Error(error.message);
+    setGalerieUrls(next);
+    onUpdated();
   }
 
-  function addGalerieUrl() {
+  async function addGalerieUrl() {
     const trimmed = galerieUrlInput.trim();
     if (!trimmed) return;
-    setGalerieUrls((prev) => [...prev, trimmed]);
-    setGalerieUrlInput("");
+    try {
+      await saveGalerie([...galerieUrls, trimmed]);
+      setGalerieUrlInput("");
+      toast.success("Photo ajoutée à la galerie");
+    } catch (error) {
+      toast.error((error as Error).message);
+    }
   }
-  function removeGalerieUrl(index: number) {
-    setGalerieUrls((prev) => prev.filter((_, i) => i !== index));
+  async function removeGalerieUrl(index: number) {
+    try {
+      await saveGalerie(galerieUrls.filter((_, i) => i !== index));
+    } catch (error) {
+      toast.error((error as Error).message);
+    }
   }
 
   async function handleGalerieFilesChange(e: ChangeEvent<HTMLInputElement>) {
@@ -1167,8 +1179,8 @@ function ProfileScreen({
       const urls = await Promise.all(
         files.map((file) => uploadCommerceFile(userId, file, "galerie")),
       );
-      setGalerieUrls((prev) => [...prev, ...urls]);
-      toast.success(`${urls.length} photo(s) ajoutée(s)`);
+      await saveGalerie([...galerieUrls, ...urls]);
+      toast.success(`${urls.length} photo(s) ajoutée(s) à la galerie`);
     } catch (error) {
       toast.error((error as Error).message);
     } finally {
@@ -1289,9 +1301,7 @@ function ProfileScreen({
               photo_url: photoUrl || null,
               logo_url: logoUrl || null,
               description: description || null,
-              horaires: horaires.filter((h) => h.jour.trim() || h.valeur.trim()),
               instagram: instagram || null,
-              galerie_urls: galerieUrls,
               video_url: videoUrl || null,
               theme_visuel: themeVisuel,
             })
@@ -1528,7 +1538,7 @@ function ProfileScreen({
                 premium: commerce.site_actif,
                 ...(photoUrl ? { photoUrl } : {}),
                 ...(logoUrl ? { logoUrl } : {}),
-                horaires,
+                horaires: commerce.horaires,
                 themeVisuel,
                 ...(description ? { description } : {}),
                 promos: [],
@@ -1601,45 +1611,6 @@ function ProfileScreen({
           placeholder="@moncommerce ou https://instagram.com/…"
         />
 
-        <div className="block">
-          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Horaires
-          </span>
-          <div className="mt-2 space-y-2">
-            {horaires.map((h, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <input
-                  value={h.jour}
-                  onChange={(e) => updateHoraire(i, "jour", e.target.value)}
-                  placeholder="Lun – Ven"
-                  className="w-28 shrink-0 rounded-xl border border-input bg-card px-3 py-2 text-xs text-foreground outline-none focus:border-navy"
-                />
-                <input
-                  value={h.valeur}
-                  onChange={(e) => updateHoraire(i, "valeur", e.target.value)}
-                  placeholder="9h – 19h"
-                  className="min-w-0 flex-1 rounded-xl border border-input bg-card px-3 py-2 text-xs text-foreground outline-none focus:border-navy"
-                />
-                <button
-                  type="button"
-                  aria-label="Retirer cet horaire"
-                  onClick={() => removeHoraire(i)}
-                  className="shrink-0 text-muted-foreground hover:text-promo"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={addHoraire}
-              className="text-xs font-semibold text-navy hover:underline"
-            >
-              + Ajouter un horaire
-            </button>
-          </div>
-        </div>
-
         <button
           type="submit"
           disabled={pending}
@@ -1648,7 +1619,148 @@ function ProfileScreen({
           {pending ? "Enregistrement…" : "Enregistrer"}
         </button>
       </form>
+
+      <HorairesTarifsCard commerce={commerce} onUpdated={onUpdated} />
     </div>
+  );
+}
+
+// Horaires et Tarifs & prestations : ouverts à toutes les formules, gratuite comprise, avec leur
+// propre enregistrement pour ne pas dépendre du long formulaire de profil.
+function HorairesTarifsCard({
+  commerce,
+  onUpdated,
+}: {
+  commerce: Commerce;
+  onUpdated: () => void;
+}) {
+  const [horaires, setHoraires] = useState<Horaire[]>(commerce.horaires);
+  const [prestations, setPrestations] = useState<Prestation[]>(commerce.prestations);
+  const [pending, setPending] = useState(false);
+
+  function updateHoraire(index: number, field: keyof Horaire, value: string) {
+    setHoraires((prev) => prev.map((h, i) => (i === index ? { ...h, [field]: value } : h)));
+  }
+  function updatePrestation(index: number, field: keyof Prestation, value: string) {
+    setPrestations((prev) => prev.map((p, i) => (i === index ? { ...p, [field]: value } : p)));
+  }
+
+  const inputCls =
+    "rounded-xl border border-input bg-card px-3 py-2 text-xs text-foreground outline-none focus:border-navy";
+
+  return (
+    <form
+      className="surface-card space-y-4 p-5"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setPending(true);
+        const cleanHoraires = horaires
+          .map((h) => ({ jour: h.jour.trim(), valeur: h.valeur.trim() }))
+          .filter((h) => h.jour || h.valeur);
+        const cleaned = cleanPrestations(prestations);
+        const { error } = await supabase
+          .from("commerces")
+          .update({ horaires: cleanHoraires, prestations: cleaned })
+          .eq("id", commerce.id);
+        setPending(false);
+        if (error) {
+          toast.error(error.message);
+          return;
+        }
+        setHoraires(cleanHoraires);
+        setPrestations(cleaned);
+        toast.success("Horaires et tarifs enregistrés");
+        onUpdated();
+      }}
+    >
+      <h2 className="font-display text-lg font-extrabold text-foreground">Horaires & tarifs</h2>
+
+      <div className="block">
+        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Horaires d'ouverture
+        </span>
+        <div className="mt-2 space-y-2">
+          {horaires.map((h, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <input
+                value={h.jour}
+                onChange={(e) => updateHoraire(i, "jour", e.target.value)}
+                placeholder="Lun – Ven"
+                className={`w-28 shrink-0 ${inputCls}`}
+              />
+              <input
+                value={h.valeur}
+                onChange={(e) => updateHoraire(i, "valeur", e.target.value)}
+                placeholder="9h – 19h"
+                className={`min-w-0 flex-1 ${inputCls}`}
+              />
+              <button
+                type="button"
+                aria-label="Retirer cet horaire"
+                onClick={() => setHoraires((prev) => prev.filter((_, j) => j !== i))}
+                className="shrink-0 text-muted-foreground hover:text-promo"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => setHoraires((prev) => [...prev, { jour: "", valeur: "" }])}
+            className="text-xs font-semibold text-navy hover:underline"
+          >
+            + Ajouter un horaire
+          </button>
+        </div>
+      </div>
+
+      <div className="block">
+        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Tarifs & prestations
+        </span>
+        <div className="mt-2 space-y-2">
+          {prestations.map((p, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <input
+                value={p.nom}
+                onChange={(e) => updatePrestation(i, "nom", e.target.value)}
+                placeholder="Coupe homme"
+                className={`min-w-0 flex-1 ${inputCls}`}
+              />
+              <input
+                value={p.prix}
+                onChange={(e) => updatePrestation(i, "prix", e.target.value)}
+                placeholder="25 €"
+                className={`w-28 shrink-0 ${inputCls}`}
+              />
+              <button
+                type="button"
+                aria-label="Retirer cette prestation"
+                onClick={() => setPrestations((prev) => prev.filter((_, j) => j !== i))}
+                className="shrink-0 text-muted-foreground hover:text-promo"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => setPrestations((prev) => [...prev, { nom: "", prix: "" }])}
+            className="text-xs font-semibold text-navy hover:underline"
+          >
+            + Ajouter une prestation
+          </button>
+        </div>
+      </div>
+
+      <button
+        type="submit"
+        disabled={pending}
+        className="w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground hover:bg-navy-soft disabled:opacity-60"
+      >
+        {pending ? "Enregistrement…" : "Enregistrer les horaires et tarifs"}
+      </button>
+    </form>
   );
 }
 

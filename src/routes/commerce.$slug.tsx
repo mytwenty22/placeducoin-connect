@@ -14,12 +14,13 @@ import { validateOfferSearch } from "@/lib/offer-search";
 import { supabase } from "@/lib/supabase";
 import { logStatEvent, isFromGoogleReferrer } from "@/lib/stats-tracking";
 import type { Horaire } from "@/lib/horaires";
+import type { Prestation } from "@/lib/prestations";
 
 async function loadRealOffer(slug: string): Promise<Offer | null> {
   const { data: commerce } = await supabase
     .from("commerces")
     .select(
-      "id, nom, trade, category, adresse, telephone, photo_url, site_actif, google_rating, google_review_count, horaires, latitude, longitude, villes(nom)",
+      "id, nom, trade, category, adresse, telephone, photo_url, site_actif, google_rating, google_review_count, horaires, prestations, galerie_urls, latitude, longitude, villes(nom)",
     )
     .eq("slug", slug)
     .maybeSingle();
@@ -86,7 +87,11 @@ async function loadRealOffer(slug: string): Promise<Offer | null> {
       day: h.jour,
       value: h.valeur,
     })),
-    services: [],
+    services: ((commerce.prestations as Prestation[] | null) ?? []).map((p) => ({
+      name: p.nom,
+      price: p.prix,
+    })),
+    galleryUrls: (commerce.galerie_urls as string[] | null) ?? [],
     premium: commerce.site_actif,
     ...(photoUrl ? { photoUrl } : {}),
     ...(commerce.google_rating != null ? { googleRating: commerce.google_rating } : {}),
@@ -324,16 +329,14 @@ function OffersCarousel({
   );
 }
 
-const GALLERY = [
-  "from-navy to-navy-soft",
-  "from-promo/80 to-promo",
-  "from-mairie/70 to-mairie",
-  "from-navy-soft to-promo/70",
-];
-
 function ShopSite() {
   const { offer } = Route.useLoaderData();
   const { offre } = Route.useSearch();
+  const galleryImages = offer.galleryUrls?.length
+    ? offer.galleryUrls
+    : offer.photoUrl
+      ? [offer.photoUrl]
+      : [];
   // Fiches de démonstration (données statiques) : une seule offre, reconstituée depuis l'Offer.
   const promos: PromoItem[] =
     offer.activePromos ??
@@ -419,27 +422,24 @@ function ShopSite() {
           <PosterClientDemoCard />
         </div>
 
-        <section className="mt-8">
-          <h2 className="font-display text-xl font-extrabold text-foreground">Galerie</h2>
-          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {offer.photoUrl ? (
-              <img
-                src={offer.photoUrl}
-                alt={offer.shop}
-                loading="lazy"
-                decoding="async"
-                className="aspect-square rounded-2xl bg-slate-50 object-contain shadow-card"
-              />
-            ) : null}
-            {GALLERY.slice(offer.photoUrl ? 1 : 0).map((g, i) => (
-              <div
-                key={i}
-                className={`aspect-square rounded-2xl bg-gradient-to-br ${g} shadow-card`}
-                aria-label={`Photo ${i + 1} de ${offer.shop}`}
-              />
-            ))}
-          </div>
-        </section>
+        {/* Galerie du commerçant (Espace Pro → Galerie photos) ; à défaut, sa photo principale. */}
+        {galleryImages.length > 0 ? (
+          <section className="mt-8">
+            <h2 className="font-display text-xl font-extrabold text-foreground">Galerie</h2>
+            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {galleryImages.map((url, i) => (
+                <img
+                  key={`${url}-${i}`}
+                  src={url}
+                  alt={`Photo ${i + 1} de ${offer.shop}`}
+                  loading="lazy"
+                  decoding="async"
+                  className="aspect-square w-full rounded-2xl bg-slate-50 object-contain shadow-card"
+                />
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
           <section className="surface-card p-5">

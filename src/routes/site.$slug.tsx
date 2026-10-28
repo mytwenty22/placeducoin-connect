@@ -10,6 +10,7 @@ import { InstallAppBanner } from "@/components/InstallAppBanner";
 import { PosterClientDemoCard } from "@/components/ClientDemoCard";
 import { supabase } from "@/lib/supabase";
 import { computeOpenStatus, type Horaire } from "@/lib/horaires";
+import type { Prestation } from "@/lib/prestations";
 import { getReadableTextColor } from "@/lib/color";
 import { THEME_STYLES, type ThemeVisuel } from "@/lib/site-theme";
 import { logStatEvent, isFromGoogleReferrer } from "@/lib/stats-tracking";
@@ -27,6 +28,7 @@ type SiteCommerce = {
   logo_url: string | null;
   description: string | null;
   horaires: Horaire[];
+  prestations: Prestation[];
   instagram: string | null;
   galerie_urls: string[];
   video_url: string | null;
@@ -74,7 +76,7 @@ export const Route = createFileRoute("/site/$slug")({
     const { data: commerce } = await supabase
       .from("commerces")
       .select(
-        "id, slug, nom, trade, adresse, telephone, photo_url, logo_url, description, horaires, instagram, galerie_urls, video_url, theme_visuel, site_actif, google_rating, google_review_count, latitude, longitude",
+        "id, slug, nom, trade, adresse, telephone, photo_url, logo_url, description, horaires, prestations, instagram, galerie_urls, video_url, theme_visuel, site_actif, google_rating, google_review_count, latitude, longitude",
       )
       .eq("slug", params.slug)
       .maybeSingle();
@@ -409,6 +411,27 @@ function StandaloneSite() {
                 <div className="mt-3">
                   <DescriptionBlock text={commerce.description} mutedClass={mutedClass} />
                 </div>
+              </section>
+            ) : null}
+
+            {/* Tarifs & prestations */}
+            {commerce.prestations.length > 0 ? (
+              <section className={`${cardClass} p-5`}>
+                <h2 className={`font-display text-lg font-extrabold ${headingClass}`}>
+                  Tarifs & prestations
+                </h2>
+                <ul className={`mt-3 divide-y ${dividerClass}`}>
+                  {commerce.prestations.map((p, i) => (
+                    <li key={i} className="flex items-center justify-between gap-4 py-2.5">
+                      <span className={`min-w-0 text-sm ${headingClass}`}>{p.nom}</span>
+                      {p.prix ? (
+                        <span className="shrink-0 font-display text-sm font-extrabold text-promo">
+                          {p.prix}
+                        </span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
               </section>
             ) : null}
 
