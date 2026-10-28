@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  CSV_TEMPLATE,
   CsvImportError,
   decodeCsvBytes,
   detectDelimiter,
@@ -156,5 +157,30 @@ describe("parseProductsCsv", () => {
     expect(importError(() => parseProductsCsv(" \n")).message).toBe("Le fichier est vide.");
     expect(importError(() => parseProductsCsv("nom;prix\n")).message).toMatch(/aucun produit/);
     expect(importError(() => parseProductsCsv("nom\nP�té")).message).toMatch(/UTF-8/);
+  });
+});
+
+describe("CSV_TEMPLATE", () => {
+  it("le modèle téléchargeable se réimporte tel quel", () => {
+    expect(parseProductsCsv(decodeCsvBytes(utf8(CSV_TEMPLATE)))).toEqual([
+      {
+        nom: "Côte de bœuf",
+        prix: 24.9,
+        description: "Maturée 30 jours, environ 1 kg",
+        photo_url: null,
+      },
+      {
+        nom: "Pain de campagne; tranché",
+        prix: 3.2,
+        description: "Farine bio, cuit au feu de bois",
+        photo_url: null,
+      },
+      {
+        nom: "Conseil personnalisé",
+        prix: null,
+        description: "Sur rendez-vous, prix sur devis",
+        photo_url: null,
+      },
+    ]);
   });
 });

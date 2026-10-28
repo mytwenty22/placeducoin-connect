@@ -149,6 +149,20 @@ const HEADER_ALIASES = {
   photo_url: ["photo", "photo url", "image", "image url", "url photo", "url image"],
 } as const;
 
+/**
+ * Modèle proposé au téléchargement sous le bouton d'import. Point-virgule et BOM UTF-8 : Excel en
+ * français l'ouvre directement en colonnes, accents compris.
+ */
+export const CSV_TEMPLATE =
+  "﻿" +
+  [
+    "nom;prix;description;photo",
+    "Côte de bœuf;24,90;Maturée 30 jours, environ 1 kg;",
+    '"Pain de campagne; tranché";3,20;Farine bio, cuit au feu de bois;',
+    "Conseil personnalisé;;Sur rendez-vous, prix sur devis;",
+  ].join("\r\n") +
+  "\r\n";
+
 export const MAX_CSV_BYTES = 2 * 1024 * 1024;
 export const MAX_CSV_PRODUCTS = 1000;
 const MAX_NOM_LENGTH = 200;

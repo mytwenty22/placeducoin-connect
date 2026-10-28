@@ -18,6 +18,7 @@ import {
   LogOut,
   Package,
   Upload,
+  Download,
   BarChart3,
   CheckCircle2,
   Megaphone,
@@ -41,7 +42,13 @@ import { geocodeAddress } from "@/lib/geocode";
 import { supabase } from "@/lib/supabase";
 import { addNotification } from "@/lib/notifications-store";
 import { slugify } from "@/lib/slugify";
-import { CsvImportError, decodeCsvBytes, MAX_CSV_BYTES, parseProductsCsv } from "@/lib/csv";
+import {
+  CSV_TEMPLATE,
+  CsvImportError,
+  decodeCsvBytes,
+  MAX_CSV_BYTES,
+  parseProductsCsv,
+} from "@/lib/csv";
 import { CATEGORIES, type CategoryKey, type CommerceListing } from "@/lib/placeducoin-data";
 import type { Horaire } from "@/lib/horaires";
 import { cleanPrestations, type Prestation } from "@/lib/prestations";
@@ -3096,6 +3103,16 @@ function OptionsScreen({
   );
 }
 
+function downloadCsvTemplate() {
+  const url = URL.createObjectURL(new Blob([CSV_TEMPLATE], { type: "text/csv;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "modele-catalogue-spotlocal.csv";
+  link.click();
+  // Libéré après coup : Safari annule le téléchargement si l'URL disparaît trop tôt.
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function CatalogueScreen({
   userId,
   commerceId,
@@ -3256,6 +3273,13 @@ function CatalogueScreen({
           option, <code>photo</code> (adresse web de l'image). Première ligne = en-têtes. Séparateur
           virgule ou point-virgule, export Excel accepté.
         </p>
+        <button
+          type="button"
+          onClick={downloadCsvTemplate}
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-navy hover:underline"
+        >
+          <Download className="h-3.5 w-3.5" /> Télécharger un modèle CSV
+        </button>
         {importError ? (
           <div
             role="alert"
