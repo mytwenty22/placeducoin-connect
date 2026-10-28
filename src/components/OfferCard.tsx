@@ -174,8 +174,10 @@ export function OfferCard({ commerce }: { commerce: CommerceListing }) {
           <div className="min-w-0">
             <h3 className={`truncate text-base font-bold ${styles.heading}`}>{commerce.shop}</h3>
             <p className={`truncate text-xs ${styles.muted}`}>{commerce.trade}</p>
+            {/* Carte épurée : présentation masquée sur mobile, une ligne au-delà. Le texte complet
+                reste sur la vitrine du commerce. */}
             {commerce.description ? (
-              <p className={`mt-1 line-clamp-2 text-xs leading-snug ${styles.muted}`}>
+              <p className={`mt-1 hidden truncate text-xs sm:block ${styles.muted}`}>
                 {commerce.description}
               </p>
             ) : null}
