@@ -1,6 +1,15 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Phone, Navigation, Clock, BadgeCheck, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Phone,
+  Navigation,
+  Clock,
+  BadgeCheck,
+  ChevronLeft,
+  ChevronRight,
+  Package,
+} from "lucide-react";
+import { useSession } from "@/hooks/use-session";
 import { AppHeader } from "@/components/AppHeader";
 import { GoogleRatingStars } from "@/components/GoogleRatingStars";
 import { CouponButton } from "@/components/CouponButton";
@@ -20,7 +29,7 @@ async function loadRealOffer(slug: string): Promise<Offer | null> {
   const { data: commerce } = await supabase
     .from("commerces")
     .select(
-      "id, nom, trade, category, adresse, telephone, photo_url, description, site_actif, google_rating, google_review_count, horaires, prestations, galerie_urls, latitude, longitude, villes(nom)",
+      "id, owner_id, nom, trade, category, adresse, telephone, photo_url, description, site_actif, google_rating, google_review_count, horaires, prestations, galerie_urls, latitude, longitude, villes(nom)",
     )
     .eq("slug", slug)
     .maybeSingle();
@@ -75,6 +84,7 @@ async function loadRealOffer(slug: string): Promise<Offer | null> {
     title: promo?.titre ?? "",
     kind: promo?.kind ?? "promo",
     commerceId: commerce.id,
+    ownerId: commerce.owner_id,
     hasLocation: commerce.latitude != null && commerce.longitude != null,
     ...(promo?.id ? { promoId: promo.id } : {}),
     ...(promo?.prix_avant != null ? { priceBefore: promo.prix_avant } : {}),
@@ -333,6 +343,8 @@ function OffersCarousel({
 function ShopSite() {
   const { offer } = Route.useLoaderData();
   const { offre } = Route.useSearch();
+  const { session } = useSession();
+  const isOwner = !!offer.ownerId && session?.user.id === offer.ownerId;
   const galleryImages = offer.galleryUrls?.length
     ? offer.galleryUrls
     : offer.photoUrl
@@ -461,6 +473,31 @@ function ShopSite() {
                 />
               ))}
             </div>
+          </section>
+        ) : null}
+
+        {/* Formule gratuite : pas de catalogue. Le commerçant qui consulte sa propre fiche voit
+            l'offre Pro à la place ; les visiteurs ne voient rien. */}
+        {!offer.premium && isOwner ? (
+          <section className="mt-8 rounded-2xl border-2 border-dashed border-mairie/40 bg-mairie/5 p-5 sm:flex sm:items-center sm:gap-5">
+            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-mairie/10 text-mairie">
+              <Package className="h-6 w-6" />
+            </div>
+            <div className="mt-3 min-w-0 flex-1 sm:mt-0">
+              <h2 className="font-display text-lg font-extrabold text-foreground">
+                Passez au Pro (19 €/mois) pour afficher votre catalogue et vos produits en ligne
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Catalogue complet avec fiches produits, import CSV et site sur-mesure. Cet encart
+                n'est visible que par vous.
+              </p>
+            </div>
+            <Link
+              to="/pro"
+              className="mt-4 inline-flex shrink-0 items-center justify-center rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 sm:mt-0"
+            >
+              Passer au Pro
+            </Link>
           </section>
         ) : null}
 
