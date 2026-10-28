@@ -403,9 +403,10 @@ function ProDashboard({ userId }: { userId: string }) {
   const { ecran } = Route.useSearch();
   const routeNavigate = Route.useNavigate();
   const [screen, setScreen] = useState<ProScreen>(ecran ?? "profil");
-  // Lu une seule fois : le paramètre est retiré de l'URL aussitôt pour qu'un rechargement ne
-  // ramène pas sur l'offre.
-  const [focusSitePro] = useState(ecran === "options");
+  // Mise en avant de l'offre 19 €/mois, via ?ecran=options ou la pop-up du catalogue. Compteur
+  // plutôt que booléen : chaque demande refait défiler jusqu'à l'offre, même onglet déjà ouvert.
+  // Le paramètre est retiré de l'URL aussitôt pour qu'un rechargement ne ramène pas sur l'offre.
+  const [focusSitePro, setFocusSitePro] = useState(ecran === "options" ? 1 : 0);
   useEffect(() => {
     if (ecran) void routeNavigate({ search: {}, replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -795,6 +796,7 @@ function ProDashboard({ userId }: { userId: string }) {
         onUpgrade={() => {
           setUpgradeOpen(false);
           setScreen("options");
+          setFocusSitePro((n) => n + 1);
         }}
       />
     </>
@@ -2835,14 +2837,14 @@ function OptionsScreen({
   onCancelBoost,
   onCheckoutSite,
   onCheckoutBoost,
-  focusSitePro = false,
+  focusSitePro = 0,
 }: {
   commerce: Commerce;
   userId: string;
   accountType: AccountType;
   profile: Profile;
   /** Arrivée depuis "Passer au Pro" (/pro?ecran=options) : on amène l'offre 19 €/mois à l'écran. */
-  focusSitePro?: boolean;
+  focusSitePro?: number;
   onProfileUpdated: () => void;
   pending: boolean;
   cancelPending: boolean;
@@ -2871,7 +2873,8 @@ function OptionsScreen({
   const siteProRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    if (focusSitePro) siteProRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (focusSitePro > 0)
+      siteProRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [focusSitePro]);
 
   return (
@@ -2901,7 +2904,7 @@ function OptionsScreen({
 
       <article
         ref={siteProRef}
-        className={`surface-card scroll-mt-4 p-5 ${focusSitePro ? "ring-2 ring-mairie" : ""}`}
+        className={`surface-card scroll-mt-4 p-5 ${focusSitePro > 0 ? "ring-2 ring-mairie" : ""}`}
       >
         <div className="flex items-center gap-2">
           <Rocket className="h-5 w-5 shrink-0 text-navy" />
