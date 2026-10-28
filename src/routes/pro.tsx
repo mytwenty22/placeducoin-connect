@@ -22,6 +22,7 @@ import {
   CheckCircle2,
   Megaphone,
   Ban,
+  Lock,
 } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { EmailPasswordLogin } from "@/components/EmailPasswordLogin";
@@ -59,6 +60,13 @@ import {
   type IdentifierInput,
 } from "@/components/EntityIdentityForm";
 import { ProTermsCheckbox } from "@/components/legal/TermsCheckbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { PRO_TERMS_VERSION, recordLegalAcceptance } from "@/lib/legal";
 
 type AccountType = "pro" | "association";
@@ -381,10 +389,11 @@ function ProSignupForm() {
   );
 }
 
+type ProScreen = "profil" | "promo" | "catalogue" | "stats" | "options";
+
 function ProDashboard({ userId }: { userId: string }) {
-  const [screen, setScreen] = useState<"profil" | "promo" | "catalogue" | "stats" | "options">(
-    "profil",
-  );
+  const [screen, setScreen] = useState<ProScreen>("profil");
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const profileQuery = useQuery({
@@ -598,6 +607,15 @@ function ProDashboard({ userId }: { userId: string }) {
 
   const commerce = commerceQuery.data;
 
+  // Fiche gratuite : l'onglet Catalogue ouvre la pop-up de mise à niveau au lieu du module.
+  function navigate(next: ProScreen) {
+    if (next === "catalogue" && !commerce.site_actif) {
+      setUpgradeOpen(true);
+      return;
+    }
+    setScreen(next);
+  }
+
   return (
     <>
       <div className="flex items-center gap-3">
@@ -671,7 +689,7 @@ function ProDashboard({ userId }: { userId: string }) {
         <ProQuickGuide
           commerce={commerce}
           isAssociation={accountType === "association"}
-          onNavigate={setScreen}
+          onNavigate={navigate}
         />
       </div>
 
@@ -692,8 +710,13 @@ function ProDashboard({ userId }: { userId: string }) {
             accountType={accountType}
           />
         ) : null}
-        {screen === "catalogue" ? (
-          <CatalogueScreen userId={userId} commerceId={commerce.id} />
+        {screen === "catalogue" && commerce.site_actif ? (
+          <CatalogueScreen
+            userId={userId}
+            commerceId={commerce.id}
+            siteActif={commerce.site_actif}
+            onUpgrade={() => setUpgradeOpen(true)}
+          />
         ) : null}
         {screen === "stats" ? (
           <StatsScreen commerce={commerce} onGoToProfile={() => setScreen("profil")} />
@@ -736,7 +759,7 @@ function ProDashboard({ userId }: { userId: string }) {
             <button
               key={key}
               type="button"
-              onClick={() => setScreen(key)}
+              onClick={() => navigate(key)}
               className={`flex flex-col items-center gap-1 py-3 text-xs font-semibold transition-colors ${
                 screen === key ? "text-navy" : "text-muted-foreground"
               }`}
@@ -747,7 +770,62 @@ function ProDashboard({ userId }: { userId: string }) {
           ))}
         </div>
       </nav>
+
+      <CatalogueUpgradeDialog
+        open={upgradeOpen}
+        onOpenChange={setUpgradeOpen}
+        onUpgrade={() => {
+          setUpgradeOpen(false);
+          setScreen("options");
+        }}
+      />
     </>
+  );
+}
+
+// Pop-up affichée quand une fiche gratuite tente d'ouvrir le catalogue ou d'importer un CSV : le
+// catalogue est réservé au Site Pro (verrou réel côté base, voir
+// 20261028100000_catalogue_site_pro_only.sql).
+function CatalogueUpgradeDialog({
+  open,
+  onOpenChange,
+  onUpgrade,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onUpgrade: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm rounded-2xl">
+        <DialogHeader className="items-center text-center">
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary">
+            <Lock className="h-6 w-6 text-navy" />
+          </span>
+          <DialogTitle className="font-display text-xl">Catalogue réservé au Site Pro</DialogTitle>
+          <DialogDescription>
+            L'import CSV et le catalogue produits complet sont inclus dans l'offre Site sur mesure à
+            19 €/mois. Vos produits s'affichent alors automatiquement sur votre vitrine publique.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={onUpgrade}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground"
+          >
+            <Rocket className="h-4 w-4" /> Passer au Site Pro
+          </button>
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            className="w-full rounded-xl border border-input bg-card py-3 text-sm font-bold text-foreground hover:bg-secondary"
+          >
+            Plus tard
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -2876,7 +2954,17 @@ function OptionsScreen({
   );
 }
 
-function CatalogueScreen({ userId, commerceId }: { userId: string; commerceId: string }) {
+function CatalogueScreen({
+  userId,
+  commerceId,
+  siteActif,
+  onUpgrade,
+}: {
+  userId: string;
+  commerceId: string;
+  siteActif: boolean;
+  onUpgrade: () => void;
+}) {
   const queryClient = useQueryClient();
   const [nom, setNom] = useState("");
   const [prix, setPrix] = useState("");
@@ -2948,6 +3036,10 @@ function CatalogueScreen({ userId, commerceId }: { userId: string; commerceId: s
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
+    if (!siteActif) {
+      onUpgrade();
+      return;
+    }
     setImporting(true);
     try {
       const text = await file.text();
@@ -2989,6 +3081,10 @@ function CatalogueScreen({ userId, commerceId }: { userId: string; commerceId: s
         className="surface-card space-y-4 p-5"
         onSubmit={(e) => {
           e.preventDefault();
+          if (!siteActif) {
+            onUpgrade();
+            return;
+          }
           if (!nom.trim()) return;
           addMutation.mutate();
         }}

@@ -98,11 +98,15 @@ export const Route = createFileRoute("/site/$slug")({
       .limit(1)
       .maybeSingle();
 
-    const { data: produits } = await supabase
-      .from("produits")
-      .select("id, nom, prix, description, photo_url")
-      .eq("commerce_id", commerce.id)
-      .order("created_at", { ascending: false });
+    // Catalogue réservé au Site Pro : une fiche gratuite n'affiche que ses promos/actus. La base
+    // applique la même règle (20261028100000_catalogue_site_pro_only.sql).
+    const { data: produits } = commerce.site_actif
+      ? await supabase
+          .from("produits")
+          .select("id, nom, prix, description, photo_url")
+          .eq("commerce_id", commerce.id)
+          .order("created_at", { ascending: false })
+      : { data: [] };
 
     return {
       commerce: commerce as SiteCommerce,
