@@ -1,6 +1,6 @@
-import { createFileRoute, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Phone, Navigation, Clock, Flame, ChevronLeft, ChevronRight } from "lucide-react";
+import { Phone, Navigation, Clock, BadgeCheck, ChevronLeft, ChevronRight } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { GoogleRatingStars } from "@/components/GoogleRatingStars";
 import { CouponButton } from "@/components/CouponButton";
@@ -367,6 +367,22 @@ function ShopSite() {
         <div className="mx-auto max-w-5xl px-4">
           <h1 className="font-display text-3xl font-extrabold sm:text-4xl">{offer.shop}</h1>
           <p className="mt-1 text-primary-foreground/80">{offer.trade}</p>
+          {/* Fiche de base : jamais de catalogue ici. Pour un Site Pro, le catalogue complet est
+              sur son site (/site/$slug). */}
+          {offer.premium ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1 rounded-full border border-primary-foreground/20 bg-primary-foreground/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground/85">
+                <BadgeCheck className="h-3.5 w-3.5" /> Site Pro
+              </span>
+              <Link
+                to="/site/$slug"
+                params={{ slug: offer.slug }}
+                className="text-xs font-semibold text-primary-foreground/85 underline-offset-2 hover:underline"
+              >
+                Voir le site et le catalogue →
+              </Link>
+            </div>
+          ) : null}
           {/* Présentation saisie dans l'Espace Pro (Mon profil → Présentation). */}
           {offer.description ? (
             <p className="mt-3 max-w-2xl whitespace-pre-line text-sm leading-relaxed text-primary-foreground/90">
@@ -486,11 +502,6 @@ function ShopSite() {
                 ))}
               </ul>
             )}
-            {offer.premium ? (
-              <p className="mt-4 inline-flex items-center gap-1 rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-navy">
-                <Flame className="h-3.5 w-3.5 text-promo" /> Site sur-mesure SpotLocal
-              </p>
-            ) : null}
           </section>
         </div>
       </main>

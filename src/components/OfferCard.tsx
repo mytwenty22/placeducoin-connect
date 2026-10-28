@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
+  BadgeCheck,
   Clock,
   MapPin,
   Flame,
@@ -195,8 +196,8 @@ export function OfferCard({ commerce }: { commerce: CommerceListing }) {
             </span>
           ) : null}
           {commerce.premium ? (
-            <span className="rounded-full bg-mairie/10 px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-mairie">
-              Site pro
+            <span className="inline-flex items-center gap-1 rounded-full bg-mairie/10 px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-mairie">
+              <BadgeCheck className="h-3 w-3" /> Site Pro
             </span>
           ) : null}
         </div>

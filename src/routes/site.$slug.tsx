@@ -1,7 +1,24 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
-import { Phone, Navigation, Clock, MapPin, CalendarDays, Instagram, Package } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import {
+  Phone,
+  Navigation,
+  Clock,
+  MapPin,
+  CalendarDays,
+  Instagram,
+  Package,
+  BadgeCheck,
+  ChevronRight,
+} from "lucide-react";
 import { BackButton } from "@/components/BackButton";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { GoogleRatingStars } from "@/components/GoogleRatingStars";
 import { ActivateOfferButton } from "@/components/ActivateOfferButton";
 import { FavoriteButton } from "@/components/FavoriteButton";
@@ -170,6 +187,98 @@ function DescriptionBlock({ text, mutedClass }: { text: string; mutedClass: stri
   return <div className={`space-y-3 text-sm leading-relaxed ${mutedClass}`}>{blocks}</div>;
 }
 
+// Catalogue complet du Site Pro : chaque produit s'ouvre sur sa fiche détaillée (grande photo,
+// description entière, prix).
+function ProductCatalogue({
+  produits,
+  cardClass,
+  headingClass,
+  mutedClass,
+  dividerClass,
+}: {
+  produits: SiteProduit[];
+  cardClass: string;
+  headingClass: string;
+  mutedClass: string;
+  dividerClass: string;
+}) {
+  const [selected, setSelected] = useState<SiteProduit | null>(null);
+
+  return (
+    <section className={`${cardClass} p-5`}>
+      <div className="flex items-baseline gap-2">
+        <h2 className={`font-display text-lg font-extrabold ${headingClass}`}>Catalogue</h2>
+        <span className={`text-xs ${mutedClass}`}>
+          {produits.length} produit{produits.length > 1 ? "s" : ""}
+        </span>
+      </div>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        {produits.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => setSelected(p)}
+            className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-colors hover:bg-slate-50 ${dividerClass}`}
+          >
+            {p.photo_url ? (
+              <img
+                src={p.photo_url}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                className="h-16 w-16 shrink-0 rounded-xl bg-slate-50 object-contain"
+              />
+            ) : (
+              <div className="grid h-16 w-16 shrink-0 place-items-center rounded-xl bg-slate-100">
+                <Package className="h-5 w-5 text-slate-400" />
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className={`truncate text-sm font-semibold ${headingClass}`}>{p.nom}</p>
+              {p.description ? (
+                <p className={`line-clamp-2 text-xs ${mutedClass}`}>{p.description}</p>
+              ) : null}
+              {p.prix != null ? (
+                <p className="mt-1 font-display text-sm font-extrabold text-promo">
+                  {p.prix.toFixed(2)} €
+                </p>
+              ) : null}
+            </div>
+            <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
+          </button>
+        ))}
+      </div>
+
+      <Dialog open={selected !== null} onOpenChange={(open) => !open && setSelected(null)}>
+        <DialogContent className="max-w-lg">
+          {selected ? (
+            <>
+              {selected.photo_url ? (
+                <img
+                  src={selected.photo_url}
+                  alt={selected.nom}
+                  className="max-h-80 w-full rounded-xl bg-slate-50 object-contain"
+                />
+              ) : null}
+              <DialogHeader>
+                <DialogTitle>{selected.nom}</DialogTitle>
+                {selected.prix != null ? (
+                  <p className="font-display text-2xl font-extrabold text-promo">
+                    {selected.prix.toFixed(2)} €
+                  </p>
+                ) : null}
+                <DialogDescription className="whitespace-pre-line text-sm leading-relaxed">
+                  {selected.description || "Pas de description pour ce produit."}
+                </DialogDescription>
+              </DialogHeader>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+    </section>
+  );
+}
+
 function StandaloneSite() {
   const { commerce, promos, event, produits } = Route.useLoaderData();
   const { offre } = Route.useSearch();
@@ -262,6 +371,9 @@ function StandaloneSite() {
           )}
           <h1 className="mt-4 font-display text-3xl font-extrabold">{commerce.nom}</h1>
           <p className="mt-1 text-white/70">{commerce.trade}</p>
+          <span className="mt-2 inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-white/85">
+            <BadgeCheck className="h-3.5 w-3.5" /> Site Pro
+          </span>
           <div className="mt-2 flex justify-center">
             <GoogleRatingStars
               rating={commerce.google_rating ?? undefined}
@@ -435,44 +547,15 @@ function StandaloneSite() {
               </section>
             ) : null}
 
-            {/* Catalogue de produits */}
+            {/* Catalogue de produits (Site Pro uniquement, voir le loader) */}
             {produits.length > 0 ? (
-              <section className={`${cardClass} p-5`}>
-                <h2 className={`font-display text-lg font-extrabold ${headingClass}`}>Catalogue</h2>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  {produits.map((p) => (
-                    <div
-                      key={p.id}
-                      className={`flex items-center gap-3 rounded-xl border p-3 ${dividerClass}`}
-                    >
-                      {p.photo_url ? (
-                        <img
-                          src={p.photo_url}
-                          alt=""
-                          loading="lazy"
-                          decoding="async"
-                          className="h-14 w-14 shrink-0 rounded-xl bg-slate-50 object-contain"
-                        />
-                      ) : (
-                        <div className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-slate-100">
-                          <Package className="h-5 w-5 text-slate-400" />
-                        </div>
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <p className={`truncate text-sm font-semibold ${headingClass}`}>{p.nom}</p>
-                        {p.description ? (
-                          <p className={`truncate text-xs ${mutedClass}`}>{p.description}</p>
-                        ) : null}
-                      </div>
-                      {p.prix != null ? (
-                        <p className="shrink-0 font-display text-sm font-extrabold text-promo">
-                          {p.prix.toFixed(2)} €
-                        </p>
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
-              </section>
+              <ProductCatalogue
+                produits={produits}
+                cardClass={cardClass}
+                headingClass={headingClass}
+                mutedClass={mutedClass}
+                dividerClass={dividerClass}
+              />
             ) : null}
 
             {/* Vidéo de présentation */}
