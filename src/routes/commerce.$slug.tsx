@@ -494,6 +494,7 @@ function ShopSite() {
             </div>
             <Link
               to="/pro"
+              search={{ ecran: "options" }}
               className="mt-4 inline-flex shrink-0 items-center justify-center rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 sm:mt-0"
             >
               Passer au Pro

@@ -74,7 +74,13 @@ type AccountType = "pro" | "association";
 
 const ENTITY_TYPE_BY_ACCOUNT = { pro: "company", association: "association" } as const;
 
+// `?ecran=options` : ouvre l'onglet Visibilité sur l'offre Site Pro 19 €/mois (bouton "Passer au
+// Pro" des fiches gratuites).
+type ProSearch = { ecran?: "options" };
+
 export const Route = createFileRoute("/pro")({
+  validateSearch: (search: Record<string, unknown>): ProSearch =>
+    search["ecran"] === "options" ? { ecran: "options" } : {},
   head: () => ({
     meta: [
       { title: "Espace Pro Commerçant — SpotLocal" },
@@ -394,7 +400,16 @@ function ProSignupForm() {
 type ProScreen = "profil" | "promo" | "catalogue" | "stats" | "options";
 
 function ProDashboard({ userId }: { userId: string }) {
-  const [screen, setScreen] = useState<ProScreen>("profil");
+  const { ecran } = Route.useSearch();
+  const routeNavigate = Route.useNavigate();
+  const [screen, setScreen] = useState<ProScreen>(ecran ?? "profil");
+  // Lu une seule fois : le paramètre est retiré de l'URL aussitôt pour qu'un rechargement ne
+  // ramène pas sur l'offre.
+  const [focusSitePro] = useState(ecran === "options");
+  useEffect(() => {
+    if (ecran) void routeNavigate({ search: {}, replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const queryClient = useQueryClient();
 
@@ -739,6 +754,7 @@ function ProDashboard({ userId }: { userId: string }) {
             onCancelBoost={() => cancelMutation.mutate("boost_actif")}
             onCheckoutSite={() => checkoutMutation.mutate("site_pro")}
             onCheckoutBoost={() => checkoutMutation.mutate("boost")}
+            focusSitePro={focusSitePro}
           />
         ) : null}
       </div>
@@ -2819,11 +2835,14 @@ function OptionsScreen({
   onCancelBoost,
   onCheckoutSite,
   onCheckoutBoost,
+  focusSitePro = false,
 }: {
   commerce: Commerce;
   userId: string;
   accountType: AccountType;
   profile: Profile;
+  /** Arrivée depuis "Passer au Pro" (/pro?ecran=options) : on amène l'offre 19 €/mois à l'écran. */
+  focusSitePro?: boolean;
   onProfileUpdated: () => void;
   pending: boolean;
   cancelPending: boolean;
@@ -2849,6 +2868,11 @@ function OptionsScreen({
     : profile.rna
       ? `RNA ${profile.rna}`
       : null;
+  const siteProRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (focusSitePro) siteProRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [focusSitePro]);
 
   return (
     <div className="space-y-4">
@@ -2875,7 +2899,10 @@ function OptionsScreen({
         </p>
       ) : null}
 
-      <article className="surface-card p-5">
+      <article
+        ref={siteProRef}
+        className={`surface-card scroll-mt-4 p-5 ${focusSitePro ? "ring-2 ring-mairie" : ""}`}
+      >
         <div className="flex items-center gap-2">
           <Rocket className="h-5 w-5 shrink-0 text-navy" />
           <h2 className="font-display text-lg font-extrabold text-foreground">
