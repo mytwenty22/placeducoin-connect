@@ -41,7 +41,7 @@ import { geocodeAddress } from "@/lib/geocode";
 import { supabase } from "@/lib/supabase";
 import { addNotification } from "@/lib/notifications-store";
 import { slugify } from "@/lib/slugify";
-import { parseCsv } from "@/lib/csv";
+import { CsvImportError, decodeCsvBytes, MAX_CSV_BYTES, parseProductsCsv } from "@/lib/csv";
 import { CATEGORIES, type CategoryKey, type CommerceListing } from "@/lib/placeducoin-data";
 import type { Horaire } from "@/lib/horaires";
 import { cleanPrestations, type Prestation } from "@/lib/prestations";
@@ -3114,6 +3114,9 @@ function CatalogueScreen({
   const [photoUrl, setPhotoUrl] = useState("");
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<{ message: string; details: string[] } | null>(
+    null,
+  );
 
   const produitsQuery = useQuery({
     queryKey: ["produits", commerceId],
@@ -3182,36 +3185,38 @@ function CatalogueScreen({
       onUpgrade();
       return;
     }
+    setImportError(null);
+    if (file.size > MAX_CSV_BYTES) {
+      setImportError({ message: "Fichier trop lourd (2 Mo maximum).", details: [] });
+      return;
+    }
     setImporting(true);
     try {
-      const text = await file.text();
-      const rows = parseCsv(text);
-      if (rows.length < 2) throw new Error("Fichier vide ou sans données.");
-      const header = rows[0]!.map((h) => h.trim().toLowerCase());
-      const nomIdx = header.indexOf("nom");
-      const prixIdx = header.indexOf("prix");
-      const descIdx = header.indexOf("description");
-      if (nomIdx === -1) {
-        throw new Error("Colonne « nom » introuvable dans le fichier.");
-      }
-      const products = rows
-        .slice(1)
-        .map((r) => ({
-          commerce_id: commerceId,
-          nom: (r[nomIdx] ?? "").trim(),
-          prix: prixIdx !== -1 && r[prixIdx]?.trim() ? Number(r[prixIdx]!.replace(",", ".")) : null,
-          description: descIdx !== -1 && r[descIdx]?.trim() ? r[descIdx]!.trim() : null,
-        }))
-        .filter((p) => p.nom.length > 0);
-      if (products.length === 0) {
-        throw new Error("Aucun produit valide trouvé dans le fichier.");
-      }
+      const text = decodeCsvBytes(new Uint8Array(await file.arrayBuffer()));
+      const products = parseProductsCsv(text).map((p) => ({ ...p, commerce_id: commerceId }));
       const { error } = await supabase.from("produits").insert(products);
-      if (error) throw new Error(error.message);
+      if (error) {
+        // RLS : l'abonnement a pris fin entre l'ouverture de l'écran et l'import.
+        throw new CsvImportError(
+          error.code === "42501"
+            ? "Import refusé : le catalogue est réservé à l'offre Site Pro (19 €/mois)."
+            : `L'enregistrement a échoué, aucun produit importé (${error.message}).`,
+        );
+      }
       queryClient.invalidateQueries({ queryKey: ["produits", commerceId] });
-      toast.success(`${products.length} produit(s) importé(s)`);
+      toast.success(
+        `${products.length} produit${products.length > 1 ? "s" : ""} importé${products.length > 1 ? "s" : ""}`,
+      );
     } catch (error) {
-      toast.error((error as Error).message);
+      const message =
+        error instanceof CsvImportError
+          ? error.message
+          : "Le fichier n'a pas pu être lu. Vérifiez qu'il s'agit bien d'un fichier CSV.";
+      setImportError({
+        message,
+        details: error instanceof CsvImportError ? error.details : [],
+      });
+      toast.error(message);
     } finally {
       setImporting(false);
     }
@@ -3247,9 +3252,28 @@ function CatalogueScreen({
           />
         </label>
         <p className="text-xs text-muted-foreground">
-          Colonnes attendues : <code>nom</code>, <code>prix</code>, <code>description</code>{" "}
-          (première ligne = en-têtes).
+          Colonnes attendues : <code>nom</code>, <code>prix</code>, <code>description</code> et, en
+          option, <code>photo</code> (adresse web de l'image). Première ligne = en-têtes. Séparateur
+          virgule ou point-virgule, export Excel accepté.
         </p>
+        {importError ? (
+          <div
+            role="alert"
+            className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800"
+          >
+            <p className="font-semibold">{importError.message}</p>
+            {importError.details.length > 0 ? (
+              <ul className="mt-1.5 list-disc space-y-0.5 pl-5 text-xs">
+                {importError.details.slice(0, 10).map((d) => (
+                  <li key={d}>{d}</li>
+                ))}
+                {importError.details.length > 10 ? (
+                  <li>… et {importError.details.length - 10} autre(s) ligne(s).</li>
+                ) : null}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           <span className="h-px flex-1 bg-border" /> ou ajouter manuellement{" "}
