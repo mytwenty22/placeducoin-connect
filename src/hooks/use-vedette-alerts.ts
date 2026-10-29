@@ -29,6 +29,9 @@ export function useVedetteAlerts(
         category: commerce.category,
         shop: commerce.shop,
         slug: commerce.slug,
+        url: `${commerce.premium ? "/site" : "/commerce"}/${commerce.slug}${
+          commerce.promos[0]?.id ? `?offre=${commerce.promos[0].id}` : ""
+        }`,
         distanceKm: commerce.distanceKm,
       });
     }

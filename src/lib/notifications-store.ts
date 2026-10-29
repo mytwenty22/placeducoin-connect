@@ -8,6 +8,8 @@ export type VedetteNotification = {
   category: CategoryKey;
   shop: string;
   slug: string;
+  /** Page ouverte au clic (Site Pro ou fiche, offre pré-sélectionnée) ; à défaut /commerce/<slug>. */
+  url?: string;
   distanceKm?: number;
   createdAt: string;
   read: boolean;

@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Bell } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
+import { Bell, ChevronRight } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -22,6 +23,7 @@ function relativeTime(iso: string): string {
 
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
   const localNotifications = useNotifications();
   const {
     notifications: dbNotifications,
@@ -30,15 +32,27 @@ export function NotificationBell() {
   } = useDbNotifications();
 
   const merged = [
-    ...localNotifications.map((n) => ({ ...n, source: "local" as const })),
-    ...dbNotifications.map((n) => ({ ...n, source: "db" as const })),
+    ...localNotifications.map((n) => ({
+      ...n,
+      source: "local" as const,
+      href: n.url ?? `/commerce/${n.slug}`,
+    })),
+    ...dbNotifications.map((n) => ({
+      ...n,
+      source: "db" as const,
+      href: n.slug ? `/commerce/${n.slug}` : null,
+    })),
   ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   const unread = merged.filter((n) => !n.read).length;
 
-  function handleClick(id: string, source: "local" | "db") {
+  // Clic : marque comme lu puis ouvre le commerce ou l'offre concernée.
+  function handleClick(id: string, source: "local" | "db", href: string | null) {
     if (source === "local") markRead(id);
     else void markDbRead(id);
+    if (!href) return;
+    setOpen(false);
+    void navigate({ href });
   }
 
   function handleMarkAll() {
@@ -89,8 +103,8 @@ export function NotificationBell() {
               <button
                 key={`${n.source}-${n.id}`}
                 type="button"
-                onClick={() => handleClick(n.id, n.source)}
-                className="flex w-full items-start gap-2 py-3 text-left"
+                onClick={() => handleClick(n.id, n.source, n.href)}
+                className="group flex w-full items-start gap-2 py-3 text-left hover:bg-secondary/60"
               >
                 <span
                   className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${n.read ? "bg-transparent" : "bg-promo"}`}
@@ -102,6 +116,9 @@ export function NotificationBell() {
                     {relativeTime(n.createdAt)}
                   </span>
                 </span>
+                {n.href ? (
+                  <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground group-hover:text-foreground" />
+                ) : null}
               </button>
             ))
           )}

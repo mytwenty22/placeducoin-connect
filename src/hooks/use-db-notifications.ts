@@ -9,6 +9,7 @@ export type DbNotification = {
   body: string;
   read: boolean;
   createdAt: string;
+  slug: string | null;
 };
 
 // Notifications persistées côté serveur (voir supabase/migrations/20260922150000_notifications_table.sql)
@@ -33,7 +34,7 @@ export function useDbNotifications() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("notifications")
-        .select("id, title, body, read, created_at")
+        .select("id, title, body, read, created_at, commerce_slug")
         .order("created_at", { ascending: false })
         .limit(50);
       if (error) throw error;
@@ -43,6 +44,7 @@ export function useDbNotifications() {
         body: n.body,
         read: n.read,
         createdAt: n.created_at,
+        slug: n.commerce_slug,
       })) satisfies DbNotification[];
     },
     enabled: !!userId,
