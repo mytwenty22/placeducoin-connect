@@ -1194,6 +1194,26 @@ function ProfileScreen({
     }
   }
 
+  // Croix de la photo, du logo et de la vidéo : retrait enregistré tout de suite, comme dans la
+  // galerie, sans passer par « Enregistrer ».
+  async function removeMedia(
+    column: "photo_url" | "logo_url" | "video_url",
+    clear: () => void,
+    label: string,
+  ) {
+    const { error } = await supabase
+      .from("commerces")
+      .update({ [column]: null })
+      .eq("id", commerce.id);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    clear();
+    toast.success(`${label} supprimé(e)`);
+    onUpdated();
+  }
+
   async function handleGalerieFilesChange(e: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
     e.target.value = "";
@@ -1346,11 +1366,21 @@ function ProfileScreen({
             Photo du commerce
           </span>
           {photoUrl ? (
-            <img
-              src={photoUrl}
-              alt=""
-              className="mt-2 h-32 w-full rounded-xl bg-slate-50 object-contain"
-            />
+            <div className="relative mt-2">
+              <img
+                src={photoUrl}
+                alt=""
+                className="h-32 w-full rounded-xl bg-slate-50 object-contain"
+              />
+              <button
+                type="button"
+                aria-label="Supprimer la photo du commerce"
+                onClick={() => removeMedia("photo_url", () => setPhotoUrl(""), "Photo")}
+                className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-black/60 text-white"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
           ) : null}
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-input bg-card px-3 py-2 text-xs font-semibold text-foreground hover:bg-secondary">
@@ -1434,7 +1464,19 @@ function ProfileScreen({
           <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Vidéo de présentation
           </span>
-          {videoUrl ? <video src={videoUrl} controls className="mt-2 w-full rounded-xl" /> : null}
+          {videoUrl ? (
+            <div className="relative mt-2">
+              <video src={videoUrl} controls className="w-full rounded-xl" />
+              <button
+                type="button"
+                aria-label="Supprimer la vidéo"
+                onClick={() => removeMedia("video_url", () => setVideoUrl(""), "Vidéo")}
+                className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-black/60 text-white"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ) : null}
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-input bg-card px-3 py-2 text-xs font-semibold text-foreground hover:bg-secondary">
               <Video className="h-4 w-4" />
@@ -1463,11 +1505,21 @@ function ProfileScreen({
             Logo
           </span>
           {logoUrl ? (
-            <img
-              src={logoUrl}
-              alt=""
-              className="mt-2 h-16 w-16 rounded-full bg-slate-50 object-contain"
-            />
+            <div className="relative mt-2 h-16 w-16">
+              <img
+                src={logoUrl}
+                alt=""
+                className="h-16 w-16 rounded-full bg-slate-50 object-contain"
+              />
+              <button
+                type="button"
+                aria-label="Supprimer le logo"
+                onClick={() => removeMedia("logo_url", () => setLogoUrl(""), "Logo")}
+                className="absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-full bg-black/60 text-white"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
           ) : null}
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-input bg-card px-3 py-2 text-xs font-semibold text-foreground hover:bg-secondary">
