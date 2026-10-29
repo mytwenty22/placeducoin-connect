@@ -53,6 +53,7 @@ import {
 import { CATEGORIES, type CategoryKey, type CommerceListing } from "@/lib/placeducoin-data";
 import type { Horaire } from "@/lib/horaires";
 import { cleanPrestations, type Prestation } from "@/lib/prestations";
+import { Switch } from "@/components/ui/switch";
 import { SITE_THEMES, THEME_KEYS, getSiteTheme, type ThemeVisuel } from "@/lib/site-theme";
 import { isBoostActive } from "@/lib/boost";
 import {
@@ -129,6 +130,7 @@ type Commerce = {
   description: string | null;
   horaires: Horaire[];
   prestations: Prestation[];
+  prestations_visibles: boolean;
   instagram: string | null;
   galerie_urls: string[];
   video_url: string | null;
@@ -497,7 +499,7 @@ function ProDashboard({ userId }: { userId: string }) {
       const { data, error } = await supabase
         .from("commerces")
         .select(
-          "id, slug, nom, trade, category, ville_id, quartier_id, adresse, code_postal, latitude, longitude, telephone, photo_url, logo_url, description, horaires, prestations, instagram, galerie_urls, video_url, theme_visuel, site_actif, boost_actif, boost_expires_at, suspended_at, suspension_reason",
+          "id, slug, nom, trade, category, ville_id, quartier_id, adresse, code_postal, latitude, longitude, telephone, photo_url, logo_url, description, horaires, prestations, prestations_visibles, instagram, galerie_urls, video_url, theme_visuel, site_actif, boost_actif, boost_expires_at, suspended_at, suspension_reason",
         )
         .eq("owner_id", userId)
         .maybeSingle();
@@ -1730,7 +1732,31 @@ function HorairesTarifsCard({
 }) {
   const [horaires, setHoraires] = useState<Horaire[]>(commerce.horaires);
   const [prestations, setPrestations] = useState<Prestation[]>(commerce.prestations);
+  const [prestationsVisibles, setPrestationsVisibles] = useState(commerce.prestations_visibles);
+  const [savingVisibility, setSavingVisibility] = useState(false);
   const [pending, setPending] = useState(false);
+
+  // Enregistré dès le clic, sans attendre le bouton du formulaire.
+  async function toggleVisibility(next: boolean) {
+    setPrestationsVisibles(next);
+    setSavingVisibility(true);
+    const { error } = await supabase
+      .from("commerces")
+      .update({ prestations_visibles: next })
+      .eq("id", commerce.id);
+    setSavingVisibility(false);
+    if (error) {
+      setPrestationsVisibles(!next);
+      toast.error(error.message);
+      return;
+    }
+    toast.success(
+      next
+        ? "Tarifs & prestations affichés sur votre page"
+        : "Tarifs & prestations masqués sur votre page",
+    );
+    onUpdated();
+  }
 
   function updateHoraire(index: number, field: keyof Horaire, value: string) {
     setHoraires((prev) => prev.map((h, i) => (i === index ? { ...h, [field]: value } : h)));
@@ -1812,7 +1838,24 @@ function HorairesTarifsCard({
         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Tarifs & prestations
         </span>
-        <div className="mt-2 space-y-2">
+        <div className="mt-2 flex items-start gap-3 rounded-xl border border-border bg-secondary/40 p-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-foreground">Afficher sur ma page publique</p>
+            <p className="text-xs text-muted-foreground">
+              {prestationsVisibles
+                ? "La section est visible sur votre fiche et votre Site Pro."
+                : "Section masquée (par exemple si votre catalogue suffit). Vos prestations restent enregistrées."}
+            </p>
+          </div>
+          <Switch
+            checked={prestationsVisibles}
+            disabled={savingVisibility}
+            onCheckedChange={(checked) => void toggleVisibility(checked)}
+            aria-label="Afficher les tarifs et prestations sur ma page publique"
+            className="mt-0.5"
+          />
+        </div>
+        <div className={`mt-2 space-y-2 ${prestationsVisibles ? "" : "opacity-60"}`}>
           {prestations.map((p, i) => (
             <div key={i} className="flex items-center gap-2">
               <input

@@ -40,6 +40,7 @@ type SiteCommerce = {
   description: string | null;
   horaires: Horaire[];
   prestations: Prestation[];
+  prestations_visibles: boolean;
   instagram: string | null;
   galerie_urls: string[];
   video_url: string | null;
@@ -91,7 +92,7 @@ export const Route = createFileRoute("/site/$slug")({
     const { data: commerce } = await supabase
       .from("commerces")
       .select(
-        "id, slug, nom, trade, adresse, telephone, photo_url, logo_url, description, horaires, prestations, instagram, galerie_urls, video_url, theme_visuel, site_actif, google_rating, google_review_count, latitude, longitude",
+        "id, slug, nom, trade, adresse, telephone, photo_url, logo_url, description, horaires, prestations, prestations_visibles, instagram, galerie_urls, video_url, theme_visuel, site_actif, google_rating, google_review_count, latitude, longitude",
       )
       .eq("slug", params.slug)
       .maybeSingle();
@@ -906,8 +907,8 @@ function StandaloneSite() {
           <ProductCatalogue produits={produits} themeVars={themeVars} phoneHref={phoneHref} />
         ) : null}
 
-        {/* Tarifs & prestations, façon carte de restaurant */}
-        {commerce.prestations.length > 0 ? (
+        {/* Tarifs & prestations, façon carte de restaurant (masquable depuis l'Espace Pro) */}
+        {commerce.prestations_visibles && commerce.prestations.length > 0 ? (
           <section>
             <Reveal>
               <SectionHeading eyebrow="La carte" title="Tarifs & prestations" />

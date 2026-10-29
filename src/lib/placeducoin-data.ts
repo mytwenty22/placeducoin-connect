@@ -54,6 +54,8 @@ export type Offer = {
   phone: string;
   hours: { day: string; value: string }[];
   services: { name: string; price: string }[];
+  /** Section Tarifs & prestations masquée par le commerçant (Espace Pro). */
+  servicesHidden?: boolean;
   galleryUrls?: string[];
   premium?: boolean;
   commerceId?: string;

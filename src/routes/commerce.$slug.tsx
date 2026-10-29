@@ -30,7 +30,7 @@ async function loadRealOffer(slug: string): Promise<Offer | null> {
   const { data: commerce } = await supabase
     .from("commerces")
     .select(
-      "id, owner_id, nom, trade, category, adresse, telephone, photo_url, description, theme_visuel, site_actif, google_rating, google_review_count, horaires, prestations, galerie_urls, latitude, longitude, villes(nom)",
+      "id, owner_id, nom, trade, category, adresse, telephone, photo_url, description, theme_visuel, site_actif, google_rating, google_review_count, horaires, prestations, prestations_visibles, galerie_urls, latitude, longitude, villes(nom)",
     )
     .eq("slug", slug)
     .maybeSingle();
@@ -102,6 +102,7 @@ async function loadRealOffer(slug: string): Promise<Offer | null> {
       name: p.nom,
       price: p.prix,
     })),
+    servicesHidden: commerce.prestations_visibles === false,
     galleryUrls: (commerce.galerie_urls as string[] | null) ?? [],
     premium: commerce.site_actif,
     themeVisuel: commerce.theme_visuel as ThemeVisuel,
@@ -514,29 +515,36 @@ function ShopSite() {
           </section>
         ) : null}
 
-        <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-          <section className="surface-card p-5">
-            <h2 className="font-display text-xl font-extrabold text-foreground">
-              Tarifs & prestations
-            </h2>
-            {offer.services.length === 0 ? (
-              <p className="mt-4 text-sm text-muted-foreground">Aucune prestation renseignée.</p>
-            ) : (
-              <ul className="mt-4 divide-y divide-border">
-                {offer.services.map((s) => (
-                  <li key={s.name} className="flex items-center justify-between gap-4 py-3">
-                    <span className="min-w-0 text-sm text-foreground">{s.name}</span>
-                    <span
-                      className="shrink-0 text-sm font-bold"
-                      style={{ color: theme.accentOnLight }}
-                    >
-                      {s.price}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+        {/* Tarifs & prestations masquables depuis l'Espace Pro : les horaires restent seuls. */}
+        <div
+          className={`mt-8 grid gap-6 ${
+            offer.servicesHidden ? "lg:max-w-xl" : "lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]"
+          }`}
+        >
+          {offer.servicesHidden ? null : (
+            <section className="surface-card p-5">
+              <h2 className="font-display text-xl font-extrabold text-foreground">
+                Tarifs & prestations
+              </h2>
+              {offer.services.length === 0 ? (
+                <p className="mt-4 text-sm text-muted-foreground">Aucune prestation renseignée.</p>
+              ) : (
+                <ul className="mt-4 divide-y divide-border">
+                  {offer.services.map((s) => (
+                    <li key={s.name} className="flex items-center justify-between gap-4 py-3">
+                      <span className="min-w-0 text-sm text-foreground">{s.name}</span>
+                      <span
+                        className="shrink-0 text-sm font-bold"
+                        style={{ color: theme.accentOnLight }}
+                      >
+                        {s.price}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
 
           <section className="surface-card p-5">
             <div className="flex items-center gap-2">
