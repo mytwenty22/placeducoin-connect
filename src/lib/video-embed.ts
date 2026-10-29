@@ -14,12 +14,6 @@ export const CLIENT_DEMO_VIDEO: DemoVideo = {
   url: "https://www.youtube.com/shorts/cLIAJbTK_DU",
 };
 
-/**
- * Vidéos de la section "SpotLocal en vidéo" de l'accueil. Pas la vidéo client : elle est réservée
- * à /compte et aux fiches ouvertes via le QR code.
- */
-export const HOME_DEMO_VIDEOS: DemoVideo[] = [PRO_DEMO_VIDEO];
-
 /** Lien YouTube / Vimeo -> URL d'intégration (iframe), ou null si le lien n'est pas reconnu. */
 export function toVideoEmbedUrl(url: string): string | null {
   let parsed: URL;

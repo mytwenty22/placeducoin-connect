@@ -90,9 +90,12 @@ function ClientAuthGate() {
           Espace Pro
         </Link>
       </p>
-      <div className="mx-auto max-w-xl pt-5">
-        <ClientDemoCard />
-      </div>
+      {/* Vidéo client : seulement à la création du compte, pas sur la connexion. */}
+      {mode === "signup" ? (
+        <div className="mx-auto max-w-xl pt-5">
+          <ClientDemoCard />
+        </div>
+      ) : null}
     </div>
   );
 }

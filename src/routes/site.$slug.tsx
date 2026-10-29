@@ -19,7 +19,6 @@ import { ActivateOfferButton } from "@/components/ActivateOfferButton";
 import { FavoriteButton } from "@/components/FavoriteButton";
 import { FeaturedEventBlock } from "@/components/FeaturedEventBlock";
 import { InstallAppBanner } from "@/components/InstallAppBanner";
-import { PosterClientDemoCard } from "@/components/ClientDemoCard";
 import { supabase } from "@/lib/supabase";
 import { useCommerceRefresh } from "@/hooks/use-commerce-refresh";
 import { computeOpenStatus, type Horaire } from "@/lib/horaires";
@@ -886,11 +885,6 @@ function StandaloneSite() {
         {promos.length > 0 ? (
           <OffersSection promos={promos} preselectedId={preselectedId} commerce={commerce} />
         ) : null}
-
-        {/* Visiteurs arrivés via le QR code de l'affiche vitrine : la vidéo client. */}
-        <div className="mx-auto max-w-2xl empty:hidden">
-          <PosterClientDemoCard />
-        </div>
 
         {/* Présentation */}
         {commerce.description ? (

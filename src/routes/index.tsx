@@ -1,9 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Search, MapPin, Megaphone, Building2, Map as MapIcon, PlayCircle, X } from "lucide-react";
-import { DemoVideos } from "@/components/DemoVideos";
-import { embeddableVideos, HOME_DEMO_VIDEOS } from "@/lib/video-embed";
+import { Search, MapPin, Megaphone, Building2, Map as MapIcon, X } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { CitySelect } from "@/components/CitySelect";
 import { useSelectedVille } from "@/hooks/use-villes";
@@ -936,23 +934,6 @@ function Marketplace() {
           </div>
         </div>
       </section>
-
-      {embeddableVideos(HOME_DEMO_VIDEOS).length > 0 ? (
-        <section className="border-t border-border/60 py-10" aria-labelledby="demo-videos-title">
-          <div className="mx-auto max-w-2xl px-4">
-            <div className="flex min-w-0 items-center gap-2">
-              <PlayCircle className="h-5 w-5 shrink-0 text-promo" />
-              <h2
-                id="demo-videos-title"
-                className="truncate font-display text-xl font-extrabold text-foreground"
-              >
-                SpotLocal en vidéo
-              </h2>
-            </div>
-            <DemoVideos videos={HOME_DEMO_VIDEOS} className="mt-4 sm:gap-5" />
-          </div>
-        </section>
-      ) : null}
 
       {/* Bannière sponsorisée : deuxième emplacement, tout en bas juste au-dessus du footer */}
       <BottomSponsorBanner banner={bottomBannerQuery.data} />

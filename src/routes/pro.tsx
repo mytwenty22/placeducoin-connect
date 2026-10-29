@@ -705,7 +705,7 @@ function ProDashboard({ userId }: { userId: string }) {
           params={{ slug: commerce.slug }}
           className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-navy hover:underline"
         >
-          Voir mon site : /site/{commerce.slug}
+          Voir le site de {commerce.nom}
         </Link>
       ) : null}
 
@@ -1319,7 +1319,7 @@ function ProfileScreen({
           params={{ slug: commerce.slug }}
           className="block rounded-xl bg-mairie/10 px-4 py-3 text-sm font-semibold text-mairie hover:underline"
         >
-          Votre site sur-mesure est en ligne : /site/{commerce.slug}
+          Votre site sur-mesure « {commerce.nom} » est en ligne
         </Link>
       ) : null}
 

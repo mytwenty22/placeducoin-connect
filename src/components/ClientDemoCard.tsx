@@ -1,11 +1,10 @@
-import { useEffect, useState } from "react";
 import { PlayCircle, X } from "lucide-react";
 import { DemoVideos } from "@/components/DemoVideos";
 import { CLIENT_DEMO_VIDEO, embeddableVideos } from "@/lib/video-embed";
 
 /**
- * Carte "Découvrir le fonctionnement en 30 sec" : la vidéo de première connexion client. Toujours
- * affichée sur /compte ; sur les fiches commerce, voir PosterClientDemoCard.
+ * Carte "Découvrir le fonctionnement en 30 sec" : la vidéo de première connexion client. Affichée
+ * uniquement à la création d'un compte client (/compte).
  */
 export function ClientDemoCard({ onDismiss }: { onDismiss?: () => void }) {
   if (embeddableVideos([CLIENT_DEMO_VIDEO]).length === 0) return null;
@@ -39,19 +38,4 @@ export function ClientDemoCard({ onDismiss }: { onDismiss?: () => void }) {
       </div>
     </section>
   );
-}
-
-/**
- * La même carte sur la fiche d'un commerce, pour les seuls visiteurs arrivés via le QR code de
- * l'affiche vitrine (`?app=1`) ; elle se ferme d'un clic.
- */
-export function PosterClientDemoCard() {
-  // Lecture de l'URL après le montage : le rendu serveur ne la connaît pas.
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    setVisible(new URLSearchParams(window.location.search).get("app") === "1");
-  }, []);
-
-  return visible ? <ClientDemoCard onDismiss={() => setVisible(false)} /> : null;
 }
