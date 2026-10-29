@@ -145,6 +145,24 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      // Comptes Pro offert (pro_offert_emails, ex. le compte test du créateur) : option activée
+      // sans Stripe, pour 24h comme après un paiement (voir stripe-webhook).
+      const { data: offert, error: offertError } = await userClient.rpc("mon_pro_offert");
+      if (offertError) throw offertError;
+      if (offert === true) {
+        const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+        const { error: boostError } = await adminClient
+          .from("commerces")
+          .update({
+            boost_actif: true,
+            boost_expires_at: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+          })
+          .eq("id", commerce.id);
+        if (boostError) throw boostError;
+        return new Response(JSON.stringify({ url: `${SITE_URL}/pro?checkout=success` }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       mode = "payment";
       lineItem = {
         price_data: {
