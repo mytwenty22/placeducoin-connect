@@ -509,6 +509,17 @@ function ProDashboard({ userId }: { userId: string }) {
     enabled: profileQuery.data?.role === "pro" || profileQuery.data?.role === "association",
   });
 
+  // Site Pro offert à vie, sans Stripe (liste pro_offert_emails, voir
+  // 20261029120000_pro_offert_createur.sql) : pas de bouton d'abonnement ni d'annulation.
+  const proOffertQuery = useQuery({
+    queryKey: ["pro-offert", userId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("mon_pro_offert");
+      if (error) throw error;
+      return data === true;
+    },
+  });
+
   const activateMutation = useMutation({
     mutationFn: async (field: "site_actif" | "boost_actif") => {
       if (!commerceQuery.data) throw new Error("Commerce introuvable.");
@@ -757,6 +768,7 @@ function ProDashboard({ userId }: { userId: string }) {
             onProfileUpdated={refreshProfile}
             pending={activateMutation.isPending}
             cancelPending={cancelMutation.isPending}
+            proOffert={proOffertQuery.data === true}
             checkoutPending={checkoutMutation.isPending}
             onActivateSite={() => activateMutation.mutate("site_actif")}
             onActivateBoost={() => activateMutation.mutate("boost_actif")}
@@ -2960,6 +2972,7 @@ function OptionsScreen({
   onProfileUpdated,
   pending,
   cancelPending,
+  proOffert,
   checkoutPending,
   onActivateSite,
   onActivateBoost,
@@ -2978,6 +2991,7 @@ function OptionsScreen({
   onProfileUpdated: () => void;
   pending: boolean;
   cancelPending: boolean;
+  proOffert: boolean;
   checkoutPending: boolean;
   onActivateSite: () => void;
   onActivateBoost: () => void;
@@ -3054,14 +3068,20 @@ function OptionsScreen({
             >
               <Check className="h-4 w-4" /> Voir mon site
             </Link>
-            <button
-              type="button"
-              disabled={cancelPending}
-              onClick={onCancelSite}
-              className="w-full rounded-xl border border-input bg-card py-3 text-sm font-bold text-foreground hover:bg-secondary disabled:opacity-60"
-            >
-              {cancelPending ? "Annulation…" : "Annuler l'abonnement"}
-            </button>
+            {proOffert ? (
+              <p className="rounded-xl bg-mairie/10 px-3 py-2.5 text-center text-sm font-semibold text-mairie">
+                Site Pro offert à vie : aucun abonnement ni prélèvement.
+              </p>
+            ) : (
+              <button
+                type="button"
+                disabled={cancelPending}
+                onClick={onCancelSite}
+                className="w-full rounded-xl border border-input bg-card py-3 text-sm font-bold text-foreground hover:bg-secondary disabled:opacity-60"
+              >
+                {cancelPending ? "Annulation…" : "Annuler l'abonnement"}
+              </button>
+            )}
           </div>
         ) : (
           <div className="mt-4 space-y-2">
