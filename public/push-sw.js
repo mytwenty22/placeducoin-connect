@@ -24,10 +24,20 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const url = new URL(event.notification.data?.url || "/", self.location.origin).href;
+  // Fenêtre SpotLocal déjà ouverte (application installée sur le téléphone) : elle est ramenée au
+  // premier plan sur la page de l'offre, au lieu d'ouvrir un nouvel onglet du navigateur.
   event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
-      for (const client of windows) {
-        if (client.url === url && "focus" in client) return client.focus();
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(async (windows) => {
+      const exact = windows.find((client) => client.url === url);
+      if (exact) return exact.focus();
+      const existing = windows.find((client) => "navigate" in client);
+      if (existing) {
+        try {
+          const navigated = await existing.navigate(url);
+          if (navigated) return navigated.focus();
+        } catch {
+          // Fenêtre non contrôlée par ce service worker : on ouvre une nouvelle fenêtre.
+        }
       }
       return self.clients.openWindow(url);
     }),

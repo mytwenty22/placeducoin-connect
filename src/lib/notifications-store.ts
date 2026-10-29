@@ -86,15 +86,46 @@ export function addNotification(
     "Notification" in window &&
     Notification.permission === "granted"
   ) {
-    try {
-      new Notification(notification.title, { body: notification.body, tag: notification.id });
-    } catch {
-      // Le constructeur Notification peut échouer sur certains navigateurs mobiles (Safari iOS
-      // en PWA non installée) : le centre de notifications interne reste malgré tout à jour.
-    }
+    void showSystemNotification(notification);
   }
 
   return notification;
+}
+
+// Notification du téléphone / de l'ordinateur, cliquable : elle ouvre l'offre concernée.
+async function showSystemNotification(notification: VedetteNotification) {
+  const url = notification.url ?? `/commerce/${notification.slug}`;
+  // Via le service worker de préférence : Android refuse `new Notification()` depuis une page, et
+  // le clic est alors géré par public/push-sw.js (data.url), comme pour les alertes push.
+  try {
+    const registration = await navigator.serviceWorker?.getRegistration();
+    if (registration) {
+      await registration.showNotification(notification.title, {
+        body: notification.body,
+        tag: notification.id,
+        icon: "/icons/icon-192.png",
+        badge: "/icons/badge-96.png",
+        data: { url },
+      });
+      return;
+    }
+  } catch {
+    // Pas de service worker utilisable : notification de page ci-dessous.
+  }
+  try {
+    const shown = new Notification(notification.title, {
+      body: notification.body,
+      tag: notification.id,
+    });
+    shown.onclick = () => {
+      window.focus();
+      window.location.assign(url);
+      shown.close();
+    };
+  } catch {
+    // Le constructeur Notification peut échouer sur certains navigateurs mobiles (Safari iOS
+    // en PWA non installée) : le centre de notifications interne reste malgré tout à jour.
+  }
 }
 
 export function markAllRead() {
