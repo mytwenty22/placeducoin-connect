@@ -3097,6 +3097,12 @@ function OptionsScreen({
                   ? "SIRET requis pour s'abonner"
                   : "S'abonner via Stripe"}
             </button>
+            {paymentLocked ? null : (
+              <p className="text-center text-xs text-muted-foreground">
+                Un code promo ? Saisissez-le sur la page de paiement Stripe (« Ajouter un code
+                promotionnel »).
+              </p>
+            )}
             {import.meta.env.DEV ? (
               <button
                 type="button"

@@ -39,6 +39,21 @@ function bannerWindow(tier: BannerTierKey, monthKey: string): { start: Date; end
   };
 }
 
+// Produit Stripe fixe du Site Pro (créé au premier paiement s'il n'existe pas) : un coupon peut
+// ainsi être limité à ce produit dans le tableau de bord Stripe (Coupons → Appliquer à des
+// produits spécifiques → « SpotLocal — Site Pro »).
+const SITE_PRO_PRODUCT_ID = "spotlocal_site_pro";
+
+async function ensureSiteProProduct(): Promise<string> {
+  try {
+    await stripe.products.retrieve(SITE_PRO_PRODUCT_ID);
+  } catch (error) {
+    if ((error as { code?: string }).code !== "resource_missing") throw error;
+    await stripe.products.create({ id: SITE_PRO_PRODUCT_ID, name: "SpotLocal — Site Pro" });
+  }
+  return SITE_PRO_PRODUCT_ID;
+}
+
 function isBoostActive(commerce: { boost_actif: boolean; boost_expires_at: string | null }) {
   if (!commerce.boost_actif) return false;
   if (!commerce.boost_expires_at) return true;
@@ -117,7 +132,7 @@ Deno.serve(async (req) => {
       lineItem = {
         price_data: {
           currency: "eur",
-          product_data: { name: "SpotLocal — Site Pro" },
+          product: await ensureSiteProProduct(),
           unit_amount: 1900,
           recurring: { interval: "month" },
         },
@@ -227,8 +242,14 @@ Deno.serve(async (req) => {
       mode,
       customer: customerId,
       line_items: [lineItem],
-      // Affiche automatiquement le champ "Code promo" sur la page de paiement Stripe.
-      allow_promotion_codes: true,
+      // Champ "Code promo" de Stripe sur l'abonnement Site Pro uniquement (codes créés dans le
+      // tableau de bord : 3 mois offerts, premier mois gratuit…). Pas sur l'option Vedette ni les
+      // bannières : un code 100 % prévu pour le Site Pro les rendrait gratuites.
+      allow_promotion_codes: type === "site_pro",
+      // Même avec un code à 100 %, la carte est enregistrée : l'abonnement repasse à 19 €/mois à
+      // la fin de la période offerte. Le webhook active le Site Pro sur une session à 0 €
+      // (payment_status "no_payment_required").
+      ...(mode === "subscription" ? { payment_method_collection: "always" as const } : {}),
       success_url: `${SITE_URL}/pro?checkout=success`,
       cancel_url: `${SITE_URL}/pro?checkout=cancel`,
       client_reference_id: commerce.id,
