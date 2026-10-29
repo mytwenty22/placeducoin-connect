@@ -10,6 +10,7 @@ import {
   Check,
   Rocket,
   Trash2,
+  Pencil,
   Image as ImageIcon,
   X,
   CalendarDays,
@@ -3208,6 +3209,8 @@ function CatalogueScreen({
   const [prix, setPrix] = useState("");
   const [description, setDescription] = useState("");
   const [photoUrl, setPhotoUrl] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<{ message: string; details: string[] } | null>(
@@ -3242,24 +3245,61 @@ function CatalogueScreen({
     }
   }
 
-  const addMutation = useMutation({
+  function resetForm() {
+    setEditingId(null);
+    setNom("");
+    setPrix("");
+    setDescription("");
+    setPhotoUrl("");
+  }
+
+  // Le crayon d'un produit charge ses valeurs dans le formulaire, qui passe en mode modification.
+  function startEditing(p: Produit) {
+    if (!siteActif) {
+      onUpgrade();
+      return;
+    }
+    setEditingId(p.id);
+    setNom(p.nom);
+    setPrix(p.prix != null ? String(p.prix) : "");
+    setDescription(p.description ?? "");
+    setPhotoUrl(p.photo_url ?? "");
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  const saveMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("produits").insert({
-        commerce_id: commerceId,
+      const fields = {
         nom,
         prix: prix ? Number(prix) : null,
         description: description || null,
         photo_url: photoUrl || null,
-      });
+      };
+      if (editingId) {
+        const { data, error } = await supabase
+          .from("produits")
+          .update({ ...fields, updated_at: new Date().toISOString() })
+          .eq("id", editingId)
+          .select("id");
+        if (error) throw new Error(error.message);
+        // RLS : sans Site Pro actif, la mise à jour ne touche aucune ligne, sans erreur.
+        if (!data?.length) {
+          throw new Error(
+            "Modification refusée : le catalogue est réservé à l'offre Site Pro (19 €/mois).",
+          );
+        }
+        return "updated" as const;
+      }
+      const { error } = await supabase
+        .from("produits")
+        .insert({ ...fields, commerce_id: commerceId });
       if (error) throw new Error(error.message);
+      return "added" as const;
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["produits", commerceId] });
-      toast.success("Produit ajouté au catalogue");
-      setNom("");
-      setPrix("");
-      setDescription("");
-      setPhotoUrl("");
+      toast.success(result === "updated" ? "Produit modifié" : "Produit ajouté au catalogue");
+      resetForm();
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -3269,7 +3309,10 @@ function CatalogueScreen({
       const { error } = await supabase.from("produits").delete().eq("id", id);
       if (error) throw new Error(error.message);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["produits", commerceId] }),
+    onSuccess: (_, id) => {
+      if (id === editingId) resetForm();
+      queryClient.invalidateQueries({ queryKey: ["produits", commerceId] });
+    },
     onError: (error: Error) => toast.error(error.message),
   });
 
@@ -3321,7 +3364,8 @@ function CatalogueScreen({
   return (
     <div className="space-y-6">
       <form
-        className="surface-card space-y-4 p-5"
+        ref={formRef}
+        className={`surface-card scroll-mt-4 space-y-4 p-5 ${editingId ? "ring-2 ring-navy" : ""}`}
         onSubmit={(e) => {
           e.preventDefault();
           if (!siteActif) {
@@ -3329,59 +3373,63 @@ function CatalogueScreen({
             return;
           }
           if (!nom.trim()) return;
-          addMutation.mutate();
+          saveMutation.mutate();
         }}
       >
         <h2 className="font-display text-lg font-extrabold text-foreground">
-          Mon Catalogue de Produits
+          {editingId ? "Modifier le produit" : "Mon Catalogue de Produits"}
         </h2>
 
-        <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-navy/40 py-3 text-sm font-semibold text-navy hover:bg-secondary">
-          <Upload className="h-4 w-4" />
-          {importing ? "Import en cours…" : "Importer un fichier CSV"}
-          <input
-            type="file"
-            accept=".csv,text/csv"
-            className="hidden"
-            disabled={importing}
-            onChange={handleCsvFileChange}
-          />
-        </label>
-        <p className="text-xs text-muted-foreground">
-          Colonnes attendues : <code>nom</code>, <code>prix</code>, <code>description</code> et, en
-          option, <code>photo</code> (adresse web de l'image). Première ligne = en-têtes. Séparateur
-          virgule ou point-virgule, export Excel accepté.
-        </p>
-        <button
-          type="button"
-          onClick={downloadCsvTemplate}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-navy hover:underline"
-        >
-          <Download className="h-3.5 w-3.5" /> Télécharger un modèle CSV
-        </button>
-        {importError ? (
-          <div
-            role="alert"
-            className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800"
-          >
-            <p className="font-semibold">{importError.message}</p>
-            {importError.details.length > 0 ? (
-              <ul className="mt-1.5 list-disc space-y-0.5 pl-5 text-xs">
-                {importError.details.slice(0, 10).map((d) => (
-                  <li key={d}>{d}</li>
-                ))}
-                {importError.details.length > 10 ? (
-                  <li>… et {importError.details.length - 10} autre(s) ligne(s).</li>
+        {editingId ? null : (
+          <>
+            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-navy/40 py-3 text-sm font-semibold text-navy hover:bg-secondary">
+              <Upload className="h-4 w-4" />
+              {importing ? "Import en cours…" : "Importer un fichier CSV"}
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                disabled={importing}
+                onChange={handleCsvFileChange}
+              />
+            </label>
+            <p className="text-xs text-muted-foreground">
+              Colonnes attendues : <code>nom</code>, <code>prix</code>, <code>description</code> et,
+              en option, <code>photo</code> (adresse web de l'image). Première ligne = en-têtes.
+              Séparateur virgule ou point-virgule, export Excel accepté.
+            </p>
+            <button
+              type="button"
+              onClick={downloadCsvTemplate}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-navy hover:underline"
+            >
+              <Download className="h-3.5 w-3.5" /> Télécharger un modèle CSV
+            </button>
+            {importError ? (
+              <div
+                role="alert"
+                className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800"
+              >
+                <p className="font-semibold">{importError.message}</p>
+                {importError.details.length > 0 ? (
+                  <ul className="mt-1.5 list-disc space-y-0.5 pl-5 text-xs">
+                    {importError.details.slice(0, 10).map((d) => (
+                      <li key={d}>{d}</li>
+                    ))}
+                    {importError.details.length > 10 ? (
+                      <li>… et {importError.details.length - 10} autre(s) ligne(s).</li>
+                    ) : null}
+                  </ul>
                 ) : null}
-              </ul>
+              </div>
             ) : null}
-          </div>
-        ) : null}
 
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          <span className="h-px flex-1 bg-border" /> ou ajouter manuellement{" "}
-          <span className="h-px flex-1 bg-border" />
-        </div>
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <span className="h-px flex-1 bg-border" /> ou ajouter manuellement{" "}
+              <span className="h-px flex-1 bg-border" />
+            </div>
+          </>
+        )}
 
         <Field label="Nom du produit" value={nom} onChange={setNom} placeholder="Côte de bœuf" />
         <label className="block">
@@ -3417,7 +3465,7 @@ function CatalogueScreen({
                 alt=""
                 className="h-24 w-24 rounded-xl bg-slate-50 object-contain"
               />
-              {/* Produit pas encore ajouté : il suffit de vider le champ. */}
+              {/* Vide le champ ; pris en compte à l'ajout ou à l'enregistrement de la modification. */}
               <button
                 type="button"
                 aria-label="Retirer la photo"
@@ -3445,11 +3493,25 @@ function CatalogueScreen({
 
         <button
           type="submit"
-          disabled={addMutation.isPending}
+          disabled={saveMutation.isPending}
           className="w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground disabled:opacity-60"
         >
-          {addMutation.isPending ? "Ajout…" : "Ajouter au catalogue"}
+          {saveMutation.isPending
+            ? "Enregistrement…"
+            : editingId
+              ? "Enregistrer les modifications"
+              : "Ajouter au catalogue"}
         </button>
+        {editingId ? (
+          <button
+            type="button"
+            onClick={resetForm}
+            disabled={saveMutation.isPending}
+            className="w-full rounded-xl border border-input bg-card py-3 text-sm font-semibold text-foreground hover:bg-secondary disabled:opacity-60"
+          >
+            Annuler
+          </button>
+        ) : null}
       </form>
 
       <section>
@@ -3461,7 +3523,12 @@ function CatalogueScreen({
             <p className="text-sm text-muted-foreground">Aucun produit pour le moment.</p>
           ) : null}
           {produitsQuery.data?.map((p) => (
-            <article key={p.id} className="surface-card flex items-start gap-3 p-3">
+            <article
+              key={p.id}
+              className={`surface-card flex items-start gap-3 p-3 ${
+                p.id === editingId ? "ring-2 ring-navy" : ""
+              }`}
+            >
               {p.photo_url ? (
                 <img
                   src={p.photo_url}
@@ -3477,6 +3544,14 @@ function CatalogueScreen({
                   {p.prix != null ? `${p.prix.toFixed(2)} €` : "Prix non renseigné"}
                 </p>
               </div>
+              <button
+                type="button"
+                aria-label={`Modifier ${p.nom}`}
+                onClick={() => startEditing(p)}
+                className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-navy"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
               <button
                 type="button"
                 aria-label={`Retirer ${p.nom}`}
