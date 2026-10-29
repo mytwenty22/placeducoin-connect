@@ -12,6 +12,7 @@ import {
   Trash2,
   Pencil,
   Image as ImageIcon,
+  Loader2,
   X,
   CalendarDays,
   Video,
@@ -2130,6 +2131,45 @@ function PromoScreen({
     onError: (error: Error) => toast.error(error.message),
   });
 
+  // Photo d'une publication existante (oubli ou erreur après publication) : changée ou retirée
+  // depuis « Mes publications », sans republier l'offre.
+  const [photoEditingId, setPhotoEditingId] = useState<string | null>(null);
+  const promoPhotoMutation = useMutation({
+    mutationFn: async ({ id, url }: { id: string; url: string | null }) => {
+      const { data, error } = await supabase
+        .from("promos")
+        .update({ photo_url: url })
+        .eq("id", id)
+        .select("id");
+      if (error) throw new Error(error.message);
+      if (!data?.length) throw new Error("La photo n'a pas pu être modifiée. Réessayez.");
+    },
+    onSuccess: (_data, { url }) => {
+      queryClient.invalidateQueries({ queryKey: ["promos", commerceId] });
+      notifyCommerceUpdated(commerce.slug);
+      toast.success(url ? "Photo mise à jour" : "Photo retirée");
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  async function handleExistingPhotoChange(id: string, e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setPhotoEditingId(id);
+    let url: string;
+    try {
+      url = await uploadCommerceFile(userId, file, "promo");
+    } catch (error) {
+      toast.error((error as Error).message);
+      setPhotoEditingId(null);
+      return;
+    }
+    // Erreur d'enregistrement : déjà signalée par onError.
+    await promoPhotoMutation.mutateAsync({ id, url }).catch(() => undefined);
+    setPhotoEditingId(null);
+  }
+
   const expireMutation = useMutation({
     mutationFn: async (id: string) => {
       const pastDate = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
@@ -2428,11 +2468,22 @@ function PromoScreen({
             return (
               <article key={p.id} className="surface-card flex items-start gap-3 p-3">
                 {p.photo_url ? (
-                  <img
-                    src={p.photo_url}
-                    alt=""
-                    className="h-10 w-10 shrink-0 rounded-lg bg-slate-50 object-contain"
-                  />
+                  <div className="relative shrink-0">
+                    <img
+                      src={p.photo_url}
+                      alt=""
+                      className="h-10 w-10 rounded-lg bg-slate-50 object-contain"
+                    />
+                    <button
+                      type="button"
+                      aria-label={`Retirer la photo de ${p.titre}`}
+                      onClick={() => promoPhotoMutation.mutate({ id: p.id, url: null })}
+                      disabled={promoPhotoMutation.isPending || photoEditingId !== null}
+                      className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-black/60 text-white disabled:opacity-60"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
                 ) : p.kind === "evenement" ? (
                   <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-navy" />
                 ) : null}
@@ -2441,6 +2492,30 @@ function PromoScreen({
                   <p className="text-xs text-muted-foreground">{subtitle}</p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
+                  <label
+                    title={p.photo_url ? "Changer la photo" : "Ajouter une photo"}
+                    className={`rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-navy ${
+                      photoEditingId !== null ? "pointer-events-none opacity-60" : "cursor-pointer"
+                    }`}
+                  >
+                    {photoEditingId === p.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <ImageIcon className="h-4 w-4" />
+                    )}
+                    <span className="sr-only">
+                      {p.photo_url
+                        ? `Changer la photo de ${p.titre}`
+                        : `Ajouter une photo à ${p.titre}`}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={photoEditingId !== null}
+                      onChange={(e) => void handleExistingPhotoChange(p.id, e)}
+                    />
+                  </label>
                   {!expired && p.kind !== "evenement" ? (
                     <button
                       type="button"
