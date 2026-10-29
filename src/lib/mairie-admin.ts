@@ -15,7 +15,7 @@ const departmentCodeSchema = z
 
 const createMairieAccountSchema = z.object({
   accessToken: z.string().min(1),
-  email: z.string().email(),
+  email: z.email(),
   password: z.string().min(8),
   villeNom: z.string().min(1),
   departmentCode: departmentCodeSchema,
