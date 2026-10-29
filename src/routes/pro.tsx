@@ -2122,11 +2122,22 @@ function PromoScreen({
             {isEvent ? "Photo de l'événement" : "Photo de l'offre"}
           </span>
           {photoUrl ? (
-            <img
-              src={photoUrl}
-              alt=""
-              className="mt-2 h-32 w-full rounded-xl bg-slate-50 object-contain"
-            />
+            <div className="relative mt-2">
+              <img
+                src={photoUrl}
+                alt=""
+                className="h-32 w-full rounded-xl bg-slate-50 object-contain"
+              />
+              {/* Offre pas encore publiée : il suffit de vider le champ. */}
+              <button
+                type="button"
+                aria-label="Retirer la photo"
+                onClick={() => setPhotoUrl("")}
+                className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-black/60 text-white"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
           ) : null}
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-input bg-card px-3 py-2 text-xs font-semibold text-foreground hover:bg-secondary">
@@ -3400,11 +3411,22 @@ function CatalogueScreen({
             Photo
           </span>
           {photoUrl ? (
-            <img
-              src={photoUrl}
-              alt=""
-              className="mt-2 h-24 w-24 rounded-xl bg-slate-50 object-contain"
-            />
+            <div className="relative mt-2 h-24 w-24">
+              <img
+                src={photoUrl}
+                alt=""
+                className="h-24 w-24 rounded-xl bg-slate-50 object-contain"
+              />
+              {/* Produit pas encore ajouté : il suffit de vider le champ. */}
+              <button
+                type="button"
+                aria-label="Retirer la photo"
+                onClick={() => setPhotoUrl("")}
+                className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-black/60 text-white"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
           ) : null}
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-input bg-card px-3 py-2 text-xs font-semibold text-foreground hover:bg-secondary">
