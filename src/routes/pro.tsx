@@ -999,7 +999,7 @@ function CreateCommerceForm({
       </h2>
 
       <Field
-        label={isAssociation ? "Nom de l'association" : "Nom de l'entreprise"}
+        label={isAssociation ? "Nom de l'association" : "Nom de l'établissement (enseigne)"}
         value={nom}
         onChange={setNom}
         placeholder={isAssociation ? "Association des commerçants" : "Boucherie Lantoine"}
@@ -1119,6 +1119,8 @@ async function uploadCommerceFile(
   return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
 }
 
+const NOM_MAX_LENGTH = 80;
+
 function ProfileScreen({
   commerce,
   userId,
@@ -1158,6 +1160,7 @@ function ProfileScreen({
   const [uploadingGalerie, setUploadingGalerie] = useState(false);
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const [pending, setPending] = useState(false);
+  const [savingNom, setSavingNom] = useState(false);
 
   async function handleCategoryClick(key: CategoryKey) {
     if (key === category) return;
@@ -1319,6 +1322,62 @@ function ProfileScreen({
         </Link>
       ) : null}
 
+      {/* Nom affiché (enseigne) : enregistré seul, pour qu'une faute de frappe se corrige sans
+          dépendre de l'adresse ou de la commune du formulaire complet. L'adresse /site/<slug>
+          ne change pas, les QR codes déjà imprimés restent valables. */}
+      <form
+        className="surface-card space-y-3 p-5"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const next = nom.trim().replace(/\s+/g, " ");
+          if (!next) {
+            toast.error("Le nom de l'établissement ne peut pas être vide.");
+            return;
+          }
+          setSavingNom(true);
+          const { error } = await supabase
+            .from("commerces")
+            .update({ nom: next })
+            .eq("id", commerce.id);
+          setSavingNom(false);
+          if (error) {
+            toast.error(error.message);
+            return;
+          }
+          setNom(next);
+          toast.success("Nom de l'établissement mis à jour");
+          onUpdated();
+          // Pages publiques déjà chargées (Site Pro, fiche, cartes de la marketplace) : rechargées
+          // avec le nouveau nom à la prochaine visite.
+          void router.invalidate();
+          void queryClient.invalidateQueries();
+        }}
+      >
+        <label className="block">
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {isAssociation ? "Nom de l'association" : "Nom de l'établissement (enseigne)"}
+          </span>
+          <input
+            value={nom}
+            onChange={(e) => setNom(e.target.value)}
+            maxLength={NOM_MAX_LENGTH}
+            placeholder={isAssociation ? "Association des commerçants" : "Boucherie Lantoine"}
+            className="mt-1 w-full rounded-xl border border-input bg-card px-3 py-2.5 text-sm text-foreground outline-none focus:border-navy"
+          />
+        </label>
+        <p className="text-xs text-muted-foreground">
+          Affiché sur votre fiche, votre Site Pro et la marketplace. L'adresse de votre site ne
+          change pas.
+        </p>
+        <button
+          type="submit"
+          disabled={savingNom || nom.trim().replace(/\s+/g, " ") === commerce.nom}
+          className="w-full rounded-xl bg-primary py-2.5 text-sm font-bold text-primary-foreground hover:bg-navy-soft disabled:opacity-60"
+        >
+          {savingNom ? "Enregistrement…" : "Enregistrer le nom"}
+        </button>
+      </form>
+
       <form
         className="surface-card space-y-4 p-5"
         onSubmit={async (e) => {
@@ -1350,7 +1409,7 @@ function ProfileScreen({
           const { error } = await supabase
             .from("commerces")
             .update({
-              nom,
+              // Le nom a son propre encadré (en haut de l'écran) : pas réécrit ici.
               trade,
               ville_id: resolved.villeId,
               quartier_id: resolved.quartierId,
@@ -1683,11 +1742,6 @@ function ProfileScreen({
           </div>
         )}
 
-        <Field
-          label={isAssociation ? "Nom de l'association" : "Nom de l'entreprise"}
-          value={nom}
-          onChange={setNom}
-        />
         <Field label={isAssociation ? "Activité" : "Métier"} value={trade} onChange={setTrade} />
         <Field
           label="Présentation"
