@@ -10,6 +10,8 @@ export type DbNotification = {
   read: boolean;
   createdAt: string;
   slug: string | null;
+  /** Offre concernée (voir send-promo-alerts) ; nul pour les notifications plus anciennes. */
+  url: string | null;
 };
 
 // Notifications persistées côté serveur (voir supabase/migrations/20260922150000_notifications_table.sql)
@@ -34,7 +36,7 @@ export function useDbNotifications() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("notifications")
-        .select("id, title, body, read, created_at, commerce_slug")
+        .select("id, title, body, read, created_at, commerce_slug, url")
         .order("created_at", { ascending: false })
         .limit(50);
       if (error) throw error;
@@ -45,6 +47,7 @@ export function useDbNotifications() {
         read: n.read,
         createdAt: n.created_at,
         slug: n.commerce_slug,
+        url: n.url,
       })) satisfies DbNotification[];
     },
     enabled: !!userId,

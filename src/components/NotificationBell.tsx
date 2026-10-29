@@ -40,7 +40,7 @@ export function NotificationBell() {
     ...dbNotifications.map((n) => ({
       ...n,
       source: "db" as const,
-      href: n.slug ? `/commerce/${n.slug}` : null,
+      href: n.url ?? (n.slug ? `/commerce/${n.slug}` : null),
     })),
   ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 

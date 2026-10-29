@@ -136,6 +136,7 @@ Deno.serve(async (req) => {
             : `Nouvelle offre chez ${commerce.nom}`,
           body: promo.titre,
           commerce_slug: commerce.slug,
+          url: offerUrl,
         })),
       );
       if (notifError) console.error("send-promo-alerts: échec insertion notifications", notifError);
