@@ -10,6 +10,7 @@ import {
   Package,
 } from "lucide-react";
 import { useSession } from "@/hooks/use-session";
+import { useCommerceRefresh } from "@/hooks/use-commerce-refresh";
 import { AppHeader } from "@/components/AppHeader";
 import { GoogleRatingStars } from "@/components/GoogleRatingStars";
 import { CouponButton } from "@/components/CouponButton";
@@ -347,6 +348,7 @@ function OffersCarousel({
 
 function ShopSite() {
   const { offer } = Route.useLoaderData();
+  useCommerceRefresh(offer.slug);
   const { offre } = Route.useSearch();
   const { session } = useSession();
   const isOwner = !!offer.ownerId && session?.user.id === offer.ownerId;

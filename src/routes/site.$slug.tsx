@@ -21,6 +21,7 @@ import { FeaturedEventBlock } from "@/components/FeaturedEventBlock";
 import { InstallAppBanner } from "@/components/InstallAppBanner";
 import { PosterClientDemoCard } from "@/components/ClientDemoCard";
 import { supabase } from "@/lib/supabase";
+import { useCommerceRefresh } from "@/hooks/use-commerce-refresh";
 import { computeOpenStatus, type Horaire } from "@/lib/horaires";
 import type { Prestation } from "@/lib/prestations";
 import { getSiteTheme, siteThemeVars } from "@/lib/site-theme";
@@ -670,6 +671,7 @@ function Gallery({
 
 function StandaloneSite() {
   const { commerce, promos, event, produits } = Route.useLoaderData();
+  useCommerceRefresh(commerce.slug);
   const { offre } = Route.useSearch();
   const preselectedId = promos.some((p) => p.id === offre) ? offre : undefined;
 

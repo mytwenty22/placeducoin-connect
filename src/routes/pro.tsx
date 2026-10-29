@@ -68,6 +68,7 @@ import {
   IdentifierFields,
   type IdentifierInput,
 } from "@/components/EntityIdentityForm";
+import { notifyCommerceUpdated } from "@/hooks/use-commerce-refresh";
 import { ProTermsCheckbox } from "@/components/legal/TermsCheckbox";
 import {
   Dialog,
@@ -1335,22 +1336,30 @@ function ProfileScreen({
             return;
           }
           setSavingNom(true);
-          const { error } = await supabase
+          // .select() : sans ligne renvoyée, la base a refusé la modification sans erreur (RLS),
+          // il ne faut pas afficher « mis à jour ».
+          const { data: saved, error } = await supabase
             .from("commerces")
             .update({ nom: next })
-            .eq("id", commerce.id);
+            .eq("id", commerce.id)
+            .select("nom")
+            .maybeSingle();
           setSavingNom(false);
-          if (error) {
-            toast.error(error.message);
+          if (error || !saved) {
+            toast.error(error?.message ?? "Le nom n'a pas pu être enregistré. Réessayez.");
             return;
           }
-          setNom(next);
+          setNom(saved.nom);
+          queryClient.setQueryData<Commerce | null>(["commerce", userId], (prev) =>
+            prev ? { ...prev, nom: saved.nom } : prev,
+          );
           toast.success("Nom de l'établissement mis à jour");
           onUpdated();
-          // Pages publiques déjà chargées (Site Pro, fiche, cartes de la marketplace) : rechargées
-          // avec le nouveau nom à la prochaine visite.
+          // Pages publiques déjà chargées dans cet onglet (Site Pro, fiche, marketplace) et dans
+          // les autres onglets ouverts : rechargées avec le nouveau nom.
           void router.invalidate();
           void queryClient.invalidateQueries();
+          notifyCommerceUpdated(commerce.slug);
         }}
       >
         <label className="block">
