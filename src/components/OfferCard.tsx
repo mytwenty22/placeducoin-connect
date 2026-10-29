@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import type { CommerceListing, PromoItem } from "@/lib/placeducoin-data";
 import { computeOpenStatus } from "@/lib/horaires";
-import { PRO_CHARTE } from "@/lib/site-theme";
+import { getSiteTheme } from "@/lib/site-theme";
 import { GoogleRatingStars } from "@/components/GoogleRatingStars";
 import { logOfferViewOnce } from "@/lib/stats-tracking";
 
@@ -48,14 +48,24 @@ function PromoKindBadge({ kind }: { kind: PromoItem["kind"] }) {
   );
 }
 
+const CARD_STYLES = {
+  cardClass:
+    "rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-12px_rgba(15,23,42,0.08)]",
+  heading: "text-slate-900",
+  muted: "text-slate-500",
+  divider: "border-slate-200/80",
+};
+
 export function OfferCard({ commerce }: { commerce: CommerceListing }) {
   const navigate = useNavigate();
   const [activeIndex, setActiveIndex] = useState(0);
   const cardRef = useRef<HTMLElement>(null);
 
   const openStatus = computeOpenStatus(commerce.horaires ?? []);
-  // Même charte pour toutes les cartes (src/lib/site-theme.ts).
-  const styles = PRO_CHARTE;
+  // Carte toujours claire sur la marketplace ; seul un liseré reprend les couleurs choisies par
+  // le commerçant (src/lib/site-theme.ts).
+  const styles = CARD_STYLES;
+  const theme = getSiteTheme(commerce.themeVisuel);
   const promos = commerce.promos;
   const hasPromos = promos.length > 0;
   const current = hasPromos ? (promos[activeIndex % promos.length] ?? promos[0]) : undefined;
@@ -109,6 +119,7 @@ export function OfferCard({ commerce }: { commerce: CommerceListing }) {
       }}
       className={`${styles.cardClass} hover-lift flex cursor-pointer flex-col overflow-hidden`}
     >
+      <div aria-hidden className="h-1 w-full shrink-0" style={{ backgroundImage: theme.band }} />
       {headerPhoto ? (
         <div className="relative">
           <img

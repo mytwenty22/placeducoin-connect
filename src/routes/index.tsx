@@ -36,6 +36,7 @@ import { useUserPrefs } from "@/lib/user-prefs";
 import { useVedetteAlerts } from "@/hooks/use-vedette-alerts";
 import { useMarketplaceRealtime } from "@/hooks/use-marketplace-realtime";
 import type { Horaire } from "@/lib/horaires";
+import type { ThemeVisuel } from "@/lib/site-theme";
 import { LEGAL_DOCS } from "@/lib/legal";
 import { deCommune } from "@/lib/french";
 
@@ -100,6 +101,7 @@ type CommerceRow = {
   logo_url: string | null;
   description: string | null;
   horaires: Horaire[];
+  theme_visuel: ThemeVisuel;
   site_actif: boolean;
   boost_actif: boolean;
   boost_expires_at: string | null;
@@ -114,7 +116,7 @@ type CommerceRow = {
 };
 
 const COMMERCE_COLUMNS =
-  "id, slug, nom, trade, category, adresse, telephone, photo_url, logo_url, description, horaires, site_actif, boost_actif, boost_expires_at, google_rating, google_review_count, quartier_id, code_postal, latitude, longitude, promos(id, titre, kind, photo_url, prix_avant, prix_maintenant, valide_jusqu_a, created_at)";
+  "id, slug, nom, trade, category, adresse, telephone, photo_url, logo_url, description, horaires, theme_visuel, site_actif, boost_actif, boost_expires_at, google_rating, google_review_count, quartier_id, code_postal, latitude, longitude, promos(id, titre, kind, photo_url, prix_avant, prix_maintenant, valide_jusqu_a, created_at)";
 
 // Plafond de repères chargés pour la zone visible de la carte (exploration hors de la ville).
 const MAP_AREA_LIMIT = 300;
@@ -170,6 +172,7 @@ function mapCommerceToListing(row: CommerceRow, fallbackCity: string): CommerceL
     ...(row.photo_url ? { photoUrl: row.photo_url } : {}),
     ...(row.logo_url ? { logoUrl: row.logo_url } : {}),
     horaires: row.horaires,
+    themeVisuel: row.theme_visuel,
     ...(row.description ? { description: row.description } : {}),
     ...(row.google_rating != null ? { googleRating: row.google_rating } : {}),
     ...(row.google_review_count != null ? { googleReviewCount: row.google_review_count } : {}),

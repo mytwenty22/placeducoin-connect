@@ -1,4 +1,5 @@
 import type { Horaire } from "@/lib/horaires";
+import type { ThemeVisuel } from "@/lib/site-theme";
 
 export type CategoryKey = "bouche" | "services" | "boutiques" | "locale";
 
@@ -65,6 +66,7 @@ export type Offer = {
   photoUrl?: string;
   logoUrl?: string;
   horaires?: Horaire[];
+  themeVisuel?: ThemeVisuel;
   description?: string;
   eventDate?: string;
   createdAt?: string;
@@ -114,6 +116,7 @@ export type CommerceListing = {
   photoUrl?: string;
   logoUrl?: string;
   horaires?: Horaire[];
+  themeVisuel?: ThemeVisuel;
   description?: string;
   googleRating?: number;
   googleReviewCount?: number;

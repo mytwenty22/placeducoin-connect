@@ -24,12 +24,13 @@ import { supabase } from "@/lib/supabase";
 import { logStatEvent, isFromGoogleReferrer } from "@/lib/stats-tracking";
 import type { Horaire } from "@/lib/horaires";
 import type { Prestation } from "@/lib/prestations";
+import { getSiteTheme, type ThemeVisuel } from "@/lib/site-theme";
 
 async function loadRealOffer(slug: string): Promise<Offer | null> {
   const { data: commerce } = await supabase
     .from("commerces")
     .select(
-      "id, owner_id, nom, trade, category, adresse, telephone, photo_url, description, site_actif, google_rating, google_review_count, horaires, prestations, galerie_urls, latitude, longitude, villes(nom)",
+      "id, owner_id, nom, trade, category, adresse, telephone, photo_url, description, theme_visuel, site_actif, google_rating, google_review_count, horaires, prestations, galerie_urls, latitude, longitude, villes(nom)",
     )
     .eq("slug", slug)
     .maybeSingle();
@@ -103,6 +104,7 @@ async function loadRealOffer(slug: string): Promise<Offer | null> {
     })),
     galleryUrls: (commerce.galerie_urls as string[] | null) ?? [],
     premium: commerce.site_actif,
+    themeVisuel: commerce.theme_visuel as ThemeVisuel,
     ...(commerce.description?.trim() ? { description: commerce.description.trim() } : {}),
     ...(photoUrl ? { photoUrl } : {}),
     ...(commerce.google_rating != null ? { googleRating: commerce.google_rating } : {}),
@@ -167,7 +169,9 @@ function OffersCarousel({
   shop,
   commerceId,
   hasLocation,
+  band,
 }: {
+  band: string;
   promos: PromoItem[];
   initialId: string | undefined;
   shop: string;
@@ -278,7 +282,7 @@ function OffersCarousel({
                   className="h-36 w-full bg-slate-50 object-contain"
                 />
               ) : null}
-              <div className="bg-gradient-promo px-5 py-4 text-promo-foreground">
+              <div className="px-5 py-4 text-white" style={{ backgroundImage: band }}>
                 <p className="text-xs font-bold uppercase tracking-widest">
                   {p.kind === "arrivage" ? "Arrivage" : "Promo"}
                   {highlighted ? " · Votre sélection" : ""}
@@ -366,6 +370,9 @@ function ShopSite() {
         ]
       : []);
 
+  // Couleurs choisies par le commerçant (Espace Pro → Mon profil), voir src/lib/site-theme.ts.
+  const theme = getSiteTheme(offer.themeVisuel);
+
   useEffect(() => {
     void logStatEvent(offer.commerceId, "app_view");
     if (isFromGoogleReferrer()) void logStatEvent(offer.commerceId, "google_view");
@@ -375,7 +382,10 @@ function ShopSite() {
     <div className="min-h-screen bg-background">
       <AppHeader />
 
-      <header className="bg-gradient-navy pb-10 pt-8 text-primary-foreground">
+      <header
+        className="pb-10 pt-8 text-primary-foreground"
+        style={{ backgroundImage: theme.band }}
+      >
         <div className="mx-auto max-w-5xl px-4">
           <h1 className="font-display text-3xl font-extrabold sm:text-4xl">{offer.shop}</h1>
           <p className="mt-1 text-primary-foreground/80">{offer.trade}</p>
@@ -421,7 +431,8 @@ function ShopSite() {
           <div className="mt-5 flex flex-wrap gap-2">
             <a
               href={`tel:${offer.phone.replace(/\s/g, "")}`}
-              className="inline-flex items-center gap-2 rounded-xl bg-promo px-4 py-2.5 text-sm font-semibold text-promo-foreground transition-opacity hover:opacity-90"
+              className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold transition-opacity hover:opacity-90"
+              style={{ color: theme.accentOnLight }}
             >
               <Phone className="h-4 w-4" /> {offer.phone}
             </a>
@@ -449,6 +460,7 @@ function ShopSite() {
             shop={offer.shop}
             commerceId={offer.commerceId}
             hasLocation={offer.hasLocation === true}
+            band={theme.band}
           />
         ) : null}
 
@@ -514,7 +526,12 @@ function ShopSite() {
                 {offer.services.map((s) => (
                   <li key={s.name} className="flex items-center justify-between gap-4 py-3">
                     <span className="min-w-0 text-sm text-foreground">{s.name}</span>
-                    <span className="shrink-0 text-sm font-bold text-navy">{s.price}</span>
+                    <span
+                      className="shrink-0 text-sm font-bold"
+                      style={{ color: theme.accentOnLight }}
+                    >
+                      {s.price}
+                    </span>
                   </li>
                 ))}
               </ul>

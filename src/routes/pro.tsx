@@ -52,7 +52,7 @@ import {
 import { CATEGORIES, type CategoryKey, type CommerceListing } from "@/lib/placeducoin-data";
 import type { Horaire } from "@/lib/horaires";
 import { cleanPrestations, type Prestation } from "@/lib/prestations";
-import { PRO_CHARTE } from "@/lib/site-theme";
+import { SITE_THEMES, THEME_KEYS, getSiteTheme, type ThemeVisuel } from "@/lib/site-theme";
 import { isBoostActive } from "@/lib/boost";
 import {
   canCompanyPay,
@@ -131,6 +131,7 @@ type Commerce = {
   instagram: string | null;
   galerie_urls: string[];
   video_url: string | null;
+  theme_visuel: ThemeVisuel;
   site_actif: boolean;
   boost_actif: boolean;
   boost_expires_at: string | null;
@@ -495,7 +496,7 @@ function ProDashboard({ userId }: { userId: string }) {
       const { data, error } = await supabase
         .from("commerces")
         .select(
-          "id, slug, nom, trade, category, ville_id, quartier_id, adresse, code_postal, latitude, longitude, telephone, photo_url, logo_url, description, horaires, prestations, instagram, galerie_urls, video_url, site_actif, boost_actif, boost_expires_at, suspended_at, suspension_reason",
+          "id, slug, nom, trade, category, ville_id, quartier_id, adresse, code_postal, latitude, longitude, telephone, photo_url, logo_url, description, horaires, prestations, instagram, galerie_urls, video_url, theme_visuel, site_actif, boost_actif, boost_expires_at, suspended_at, suspension_reason",
         )
         .eq("owner_id", userId)
         .maybeSingle();
@@ -1131,6 +1132,7 @@ function ProfileScreen({
   const [telephone, setTelephone] = useState(commerce.telephone ?? "");
   const [photoUrl, setPhotoUrl] = useState(commerce.photo_url ?? "");
   const [logoUrl, setLogoUrl] = useState(commerce.logo_url ?? "");
+  const [themeVisuel, setThemeVisuel] = useState<ThemeVisuel>(commerce.theme_visuel);
   const [description, setDescription] = useState(commerce.description ?? "");
   const [instagram, setInstagram] = useState(commerce.instagram ?? "");
   const [galerieUrls, setGalerieUrls] = useState<string[]>(commerce.galerie_urls);
@@ -1325,6 +1327,7 @@ function ProfileScreen({
               description: description || null,
               instagram: instagram || null,
               video_url: videoUrl || null,
+              theme_visuel: themeVisuel,
             })
             .eq("id", commerce.id);
           setPending(false);
@@ -1490,10 +1493,55 @@ function ProfileScreen({
 
         <div className="block">
           <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Couleurs de la fiche
+          </span>
+          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {THEME_KEYS.map((key) => {
+              const t = SITE_THEMES[key];
+              const selected = themeVisuel === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => setThemeVisuel(key)}
+                  className={`overflow-hidden rounded-xl border text-left transition-shadow ${
+                    selected ? "border-navy ring-2 ring-navy" : "border-input hover:shadow-card"
+                  }`}
+                >
+                  <span className="block h-10" style={{ backgroundImage: t.band }} />
+                  <span className="flex items-center gap-2 bg-card px-3 py-2">
+                    <span
+                      className="h-3 w-3 shrink-0 rounded-full"
+                      style={{ backgroundColor: t.palette.accent }}
+                    />
+                    <span className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground">
+                      {t.label}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {t.isDark ? "Sombre" : "Clair"}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <span className="mt-1 block text-xs text-muted-foreground">
+            {commerce.site_actif
+              ? "Appliquées à toute votre fiche et à votre Site Pro (fond, blocs, boutons)."
+              : "Appliquées à l'en-tête et aux prix de votre fiche. Avec le Site Pro, elles habillent tout votre site."}
+          </span>
+        </div>
+
+        <div className="block">
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Aperçu du site
           </span>
           <div className="mt-2 overflow-hidden rounded-xl border border-border">
-            <div className={`px-4 py-6 text-center text-white ${PRO_CHARTE.headerBg}`}>
+            <div
+              className="px-4 py-6 text-center text-white"
+              style={{ backgroundImage: getSiteTheme(themeVisuel).band }}
+            >
               {logoUrl ? (
                 <img
                   src={logoUrl}
@@ -1532,6 +1580,7 @@ function ProfileScreen({
                 ...(photoUrl ? { photoUrl } : {}),
                 ...(logoUrl ? { logoUrl } : {}),
                 horaires: commerce.horaires,
+                themeVisuel,
                 ...(description ? { description } : {}),
                 promos: [],
               }}
@@ -2138,6 +2187,7 @@ function PromoScreen({
                 ...(commerce.photo_url ? { photoUrl: commerce.photo_url } : {}),
                 ...(commerce.logo_url ? { logoUrl: commerce.logo_url } : {}),
                 horaires: commerce.horaires,
+                themeVisuel: commerce.theme_visuel,
                 ...(commerce.description ? { description: commerce.description } : {}),
                 promos: [
                   {
