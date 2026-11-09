@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { Session } from "@supabase/supabase-js";
 import { KeyRound, LogOut, ShieldCheck, UserPlus } from "lucide-react";
+import { AdminClaims } from "@/components/AdminClaims";
 import { AdminFiches } from "@/components/AdminFiches";
 import { AdminQuartiers } from "@/components/AdminQuartiers";
 import { AppHeader } from "@/components/AppHeader";
@@ -189,6 +190,8 @@ function AdminDashboard({ userId }: { userId: string }) {
           <LogOut className="h-3.5 w-3.5" /> Déconnexion
         </button>
       </header>
+
+      <AdminClaims />
 
       <AdminFiches />
 

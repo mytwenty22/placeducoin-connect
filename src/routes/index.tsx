@@ -253,6 +253,7 @@ function Marketplace() {
       const { data, error } = await supabase
         .from("commerces")
         .select(COMMERCE_COLUMNS)
+        .eq("is_demo", false)
         .eq("ville_id", selectedVille?.id)
         .gt("promos.valide_jusqu_a", new Date().toISOString());
       if (error) throw error;
@@ -411,6 +412,7 @@ function Marketplace() {
       const located = supabase
         .from("commerces")
         .select(columns)
+        .eq("is_demo", false)
         .gte("latitude", south - 0.01)
         .lte("latitude", north + 0.01)
         .gte("longitude", west - 0.01)
@@ -423,6 +425,7 @@ function Marketplace() {
           ? supabase
               .from("commerces")
               .select(columns)
+              .eq("is_demo", false)
               .in("ville_id", nearbyVilleIds)
               .is("latitude", null)
               .gt("promos.valide_jusqu_a", nowIso)

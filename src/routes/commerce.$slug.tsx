@@ -13,6 +13,7 @@ import { useSession } from "@/hooks/use-session";
 import { useCommerceRefresh } from "@/hooks/use-commerce-refresh";
 import { AppHeader } from "@/components/AppHeader";
 import { GoogleRatingStars } from "@/components/GoogleRatingStars";
+import { ClaimListing } from "@/components/ClaimListing";
 import { CouponButton } from "@/components/CouponButton";
 import { ActivateOfferButton } from "@/components/ActivateOfferButton";
 import { FavoriteButton } from "@/components/FavoriteButton";
@@ -30,7 +31,7 @@ async function loadRealOffer(slug: string): Promise<Offer | null> {
   const { data: commerce } = await supabase
     .from("commerces")
     .select(
-      "id, owner_id, nom, trade, category, adresse, telephone, photo_url, description, theme_visuel, site_actif, google_rating, google_review_count, horaires, prestations, prestations_visibles, galerie_urls, latitude, longitude, villes(nom)",
+      "id, owner_id, claimed, nom, trade, category, adresse, telephone, photo_url, description, theme_visuel, site_actif, google_rating, google_review_count, horaires, prestations, prestations_visibles, galerie_urls, latitude, longitude, villes(nom)",
     )
     .eq("slug", slug)
     .maybeSingle();
@@ -86,6 +87,7 @@ async function loadRealOffer(slug: string): Promise<Offer | null> {
     kind: promo?.kind ?? "promo",
     commerceId: commerce.id,
     ownerId: commerce.owner_id,
+    claimed: commerce.claimed,
     hasLocation: commerce.latitude != null && commerce.longitude != null,
     ...(promo?.id ? { promoId: promo.id } : {}),
     ...(promo?.prix_avant != null ? { priceBefore: promo.prix_avant } : {}),
@@ -563,6 +565,10 @@ function ShopSite() {
             )}
           </section>
         </div>
+
+        {offer.commerceId && offer.claimed === false && !isOwner ? (
+          <ClaimListing commerceId={offer.commerceId} slug={offer.slug} shop={offer.shop} />
+        ) : null}
       </main>
 
       <InstallAppBanner />

@@ -61,6 +61,8 @@ export type Offer = {
   commerceId?: string;
   /** Compte du commerçant : l'encart "Passez au Pro" ne s'affiche qu'à lui. */
   ownerId?: string;
+  /** Faux tant qu'aucun gérant n'a revendiqué la fiche. */
+  claimed?: boolean;
   promoId?: string;
   // Vrai quand le commerçant a renseigné la position GPS de sa boutique : condition pour proposer
   // « Profiter de cette offre en caisse » (activation vérifiée dans un rayon de 100 m).
