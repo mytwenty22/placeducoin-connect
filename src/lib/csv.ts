@@ -133,7 +133,7 @@ export function parsePrice(raw: string): number | null {
   return /^\d+(\.\d+)?$/.test(normalized) ? Number(normalized) : Number.NaN;
 }
 
-const normalizeHeader = (h: string) =>
+export const normalizeHeader = (h: string) =>
   h
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")

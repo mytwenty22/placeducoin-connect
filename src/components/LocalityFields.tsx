@@ -14,11 +14,13 @@ export function LocalityFields({
   onChange,
   adresse,
   initialVilleId,
+  hideQuartier = false,
 }: {
   value: LocalityValue;
   onChange: (value: LocalityValue) => void;
   adresse: string;
   initialVilleId?: string;
+  hideQuartier?: boolean;
 }) {
   // Les effets ci-dessous sont asynchrones : on lit toujours la dernière valeur, pas celle
   // capturée au moment où l'effet a démarré.
@@ -184,7 +186,7 @@ export function LocalityFields({
         </p>
       ) : null}
 
-      {value.insee ? (
+      {value.insee && !hideQuartier ? (
         <div className="space-y-2">
           <label className="block">
             <span className={labelCls}>Quartier / secteur</span>

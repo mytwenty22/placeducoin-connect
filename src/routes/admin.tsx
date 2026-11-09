@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { Session } from "@supabase/supabase-js";
 import { KeyRound, LogOut, ShieldCheck, UserPlus } from "lucide-react";
+import { AdminAddFiches } from "@/components/AdminAddFiches";
 import { AdminClaims } from "@/components/AdminClaims";
 import { AdminFiches } from "@/components/AdminFiches";
 import { AdminQuartiers } from "@/components/AdminQuartiers";
@@ -192,6 +193,8 @@ function AdminDashboard({ userId }: { userId: string }) {
       </header>
 
       <AdminClaims />
+
+      <AdminAddFiches />
 
       <AdminFiches />
 
