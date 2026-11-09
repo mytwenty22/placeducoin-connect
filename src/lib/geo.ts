@@ -1,7 +1,7 @@
 export type LatLng = { lat: number; lng: number };
 
 // Coordonnées approximatives des communes utilisées par la marketplace (démo + villes réelles
-// créées par les pros). Une commune absente de cette liste retombe sur DEFAULT_COORDS (Paris).
+// créées par les pros). Une commune absente de cette liste retombe sur DEFAULT_COORDS (Bordeaux).
 const CITY_COORDS: Record<string, LatLng> = {
   Annecy: { lat: 45.8992, lng: 6.1294 },
   Bayeux: { lat: 49.2764, lng: -0.7024 },
@@ -33,32 +33,15 @@ export function cityCenter(cityName: string): LatLng | null {
   return CITY_COORDS[cityName] ?? null;
 }
 
-const DEFAULT_COORDS: LatLng = { lat: 48.8566, lng: 2.3522 };
+const DEFAULT_COORDS: LatLng = { lat: 44.8378, lng: -0.5792 };
 
-function hashString(value: string): number {
+export function hashString(value: string): number {
   let hash = 0;
   for (let i = 0; i < value.length; i++) {
     hash = (hash << 5) - hash + value.charCodeAt(i);
     hash |= 0;
   }
   return hash;
-}
-
-function unitFromHash(hash: number): number {
-  return (Math.abs(hash) % 1000) / 1000;
-}
-
-/**
- * Les fiches commerce n'ont pas de coordonnées GPS réelles en base : on dérive une position
- * stable (toujours la même pour un même commerce) autour du centre de sa commune, pour pouvoir
- * calculer une distance plausible avec la position réelle de l'utilisateur.
- */
-export function derivePosition(slug: string, cityName: string): LatLng {
-  const base = CITY_COORDS[cityName] ?? DEFAULT_COORDS;
-  const spanDeg = 0.06; // ~ ±3 km
-  const jitterLat = (unitFromHash(hashString(`${slug}:lat`)) - 0.5) * spanDeg;
-  const jitterLng = (unitFromHash(hashString(`${slug}:lng`)) - 0.5) * spanDeg;
-  return { lat: base.lat + jitterLat, lng: base.lng + jitterLng };
 }
 
 export function haversineKm(a: LatLng, b: LatLng): number {
@@ -82,11 +65,11 @@ export function withComputedDistance<
 >(offers: T[], position: LatLng | null): T[] {
   if (!position) return offers;
   return offers.map((offer) => {
-    // Position réelle de la boutique quand le commerçant l'a renseignée ; sinon position dérivée.
+    // Position réelle de la boutique quand le commerçant l'a renseignée ; sinon centre de sa commune.
     const shop =
       offer.latitude != null && offer.longitude != null
         ? { lat: offer.latitude, lng: offer.longitude }
-        : derivePosition(offer.slug, offer.city);
+        : (CITY_COORDS[offer.city] ?? DEFAULT_COORDS);
     return { ...offer, distanceKm: Math.round(haversineKm(position, shop) * 10) / 10 };
   });
 }

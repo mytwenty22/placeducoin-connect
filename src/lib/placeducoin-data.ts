@@ -6,20 +6,20 @@ export type CategoryKey = "bouche" | "services" | "boutiques" | "locale";
 export const CATEGORIES: { key: CategoryKey; label: string; sub: string[] }[] = [
   {
     key: "bouche",
-    label: "Bouche & Alimentaire",
-    sub: ["Boucher", "Charcutier", "Boulanger", "Primeur"],
+    label: "Alimentation & Bouche",
+    sub: ["Boucher", "Charcutier", "Boulanger", "Primeur", "Chocolatier"],
+  },
+  {
+    key: "boutiques",
+    label: "Boutiques & Mode",
+    sub: ["Prêt-à-porter", "Fleuriste", "Libraire", "Opticien", "Déco"],
   },
   {
     key: "services",
     label: "Services & Bien-être",
     sub: ["Coiffeur", "Institut", "Réparateur"],
   },
-  {
-    key: "boutiques",
-    label: "Boutiques & Mode",
-    sub: ["Prêt-à-porter", "Fleuriste", "Déco"],
-  },
-  { key: "locale", label: "Vie Locale & Mairie", sub: ["Informations de la commune"] },
+  { key: "locale", label: "Vie Locale", sub: ["Informations de la commune"] },
 ];
 
 export const CITIES = [

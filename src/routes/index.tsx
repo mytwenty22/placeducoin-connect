@@ -30,7 +30,10 @@ import { supabase } from "@/lib/supabase";
 import { normalizeSearch } from "@/lib/utils";
 import { cityCenter, haversineKm, withComputedDistance } from "@/lib/geo";
 import { isBoostActive } from "@/lib/boost";
+import { isMarketplaceEligible, sortBoostSpot, sortMarketplace } from "@/lib/marketplace-sort";
 import { useUserPrefs } from "@/lib/user-prefs";
+import { useFavoriteIds } from "@/hooks/use-favorites";
+import { useSession } from "@/hooks/use-session";
 import { useVedetteAlerts } from "@/hooks/use-vedette-alerts";
 import { useMarketplaceRealtime } from "@/hooks/use-marketplace-realtime";
 import type { Horaire } from "@/lib/horaires";
@@ -178,32 +181,9 @@ function mapCommerceToListing(row: CommerceRow, fallbackCity: string): CommerceL
   };
 }
 
-// Hiérarchie d'affichage de la marketplace : en tête, les abonnés Site Pro (site_actif) et les
-// commerces ayant payé l'option Vedette 24h (sponsored) -- les deux groupes payants partagent le
-// haut du fil, les fiches gratuites sans aucune option restent en bas. Au sein du groupe payant,
-// Vedette passe devant (badge rouge, option limitée dans le temps) ; un commerce avec une offre
-// active en cours passe avant les autres du même rang, puis on retombe sur l'ordre alphabétique.
-function sortByTier(commerces: CommerceListing[]): CommerceListing[] {
-  // Groupe (0 = payant : Site Pro et/ou Vedette, 1 = gratuit sans aucune option).
-  function group(c: CommerceListing): number {
-    return c.sponsored || c.premium ? 0 : 1;
-  }
-  // Au sein du groupe payant, Vedette (badge rouge, option 24h) passe devant Site Pro seul.
-  function rank(c: CommerceListing): number {
-    if (c.sponsored) return 0;
-    if (c.premium) return 1;
-    return 2;
-  }
-  return [...commerces].sort((a, b) => {
-    const groupDiff = group(a) - group(b);
-    if (groupDiff !== 0) return groupDiff;
-    const rankDiff = rank(a) - rank(b);
-    if (rankDiff !== 0) return rankDiff;
-    const hasPromoDiff = (b.promos.length > 0 ? 1 : 0) - (a.promos.length > 0 ? 1 : 0);
-    if (hasPromoDiff !== 0) return hasPromoDiff;
-    return a.shop.localeCompare(b.shop, "fr");
-  });
-}
+// Graine de la rotation, tirée au chargement du site : l'ordre change à chaque visite, mais pas
+// quand le visiteur revient d'une fiche vers la liste.
+const VISIT_SEED = String(Math.random());
 
 function matchesSearch(commerce: CommerceListing, normalizedQuery: string): boolean {
   const categoryLabel = CATEGORIES.find((c) => c.key === commerce.category)?.label ?? "";
@@ -276,7 +256,9 @@ function Marketplace() {
         .eq("ville_id", selectedVille?.id)
         .gt("promos.valide_jusqu_a", new Date().toISOString());
       if (error) throw error;
-      return (data as unknown as CommerceRow[]).map((row) => mapCommerceToListing(row, city));
+      return (data as unknown as CommerceRow[])
+        .filter(isMarketplaceEligible)
+        .map((row) => mapCommerceToListing(row, city));
     },
     enabled: !!selectedVille && !isExternal,
     // L'option Vedette expire au bout de 24h sans qu'aucune écriture en base ne le déclenche :
@@ -288,6 +270,8 @@ function Marketplace() {
   useMarketplaceRealtime();
 
   const commercesWithDistance = withComputedDistance(commercesQuery.data ?? [], position);
+  const { session } = useSession();
+  const favoriteIds = new Set(useFavoriteIds(session?.user.id).data ?? []);
 
   // Le rayon "autour de moi" ne s'applique que si le visiteur se trouve dans la commune affichée.
   // Quand il en choisit une autre (un commerçant de Canéjan qui consulte Bordeaux…), toutes les
@@ -448,7 +432,7 @@ function Marketplace() {
       if (a.error) throw a.error;
       if (b?.error) throw b.error;
       const rows = [...(a.data ?? []), ...(b?.data ?? [])] as unknown as CommerceRow[];
-      return rows.map((row) => {
+      return rows.filter(isMarketplaceEligible).map((row) => {
         const v = Array.isArray(row.villes) ? row.villes[0] : row.villes;
         return {
           ...mapCommerceToListing(row, v?.nom ?? ""),
@@ -467,11 +451,9 @@ function Marketplace() {
     if (!isExternal && selectedCodePostal) {
       data = data.filter((c) => c.codePostal === selectedCodePostal);
     }
-    if (isSearching) {
-      return sortByTier(data.filter((c) => matchesSearch(c, searchQuery)));
-    }
-    if (category === null) return sortByTier(data);
-    return sortByTier(data.filter((c) => c.category === category));
+    if (isSearching) return data.filter((c) => matchesSearch(c, searchQuery));
+    if (category === null) return data;
+    return data.filter((c) => c.category === category);
   }, [
     isExternal,
     mapAreaQuery.data,
@@ -487,7 +469,10 @@ function Marketplace() {
   // Mémoïsé : la carte redessine ses marqueurs (et ferme un pop-up ouvert) à chaque nouvelle liste.
   const visibleCommerces = useMemo(() => {
     const withDistance = withComputedDistance(filtered, position);
-    return radiusApplies ? withDistance.filter((c) => c.distanceKm <= radiusKm) : withDistance;
+    const inRadius = radiusApplies
+      ? withDistance.filter((c) => c.distanceKm <= radiusKm)
+      : withDistance;
+    return sortMarketplace(inRadius, VISIT_SEED);
   }, [filtered, position, radiusApplies, radiusKm]);
 
   // Liste de la ville (avec tous ses filtres) + repères des autres communes de la zone, filtrés
@@ -516,12 +501,16 @@ function Marketplace() {
   // Encart VIP "À la une" : réservé aux commerces qui cumulent Site Pro ET l'option Vedette 24h
   // en cours -- pas juste l'un ou l'autre. Dès que le boost expire (isBoostActive côté requête)
   // ou que l'abonnement Site Pro est annulé, le commerce en sort au prochain refetch/realtime.
-  const vip = commercesWithDistance.filter(
-    (c) =>
-      c.sponsored &&
-      c.premium &&
-      (!radiusApplies || c.distanceKm <= radiusKm) &&
-      (!activeQuartierId || c.quartierId === activeQuartierId),
+  const vip = sortBoostSpot(
+    commercesWithDistance.filter(
+      (c) =>
+        c.sponsored &&
+        c.premium &&
+        (!radiusApplies || c.distanceKm <= radiusKm) &&
+        (!activeQuartierId || c.quartierId === activeQuartierId),
+    ),
+    favoriteIds,
+    VISIT_SEED,
   );
 
   const noticesQuery = useQuery({

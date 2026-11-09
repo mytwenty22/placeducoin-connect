@@ -1009,8 +1009,7 @@ function CreateCommerceForm({
 
       {isAssociation ? (
         <p className="rounded-xl bg-secondary p-3 text-xs text-muted-foreground">
-          Votre fiche apparaît automatiquement dans l'onglet « Vie Locale & Mairie » de la
-          Marketplace.
+          Votre fiche apparaît automatiquement dans l'onglet « Vie Locale » de la Marketplace.
         </p>
       ) : (
         <label className="block">
@@ -2382,8 +2381,8 @@ function PromoScreen({
             </label>
             <p className="rounded-xl bg-secondary p-3 text-xs text-muted-foreground">
               {boosted
-                ? "Votre offre est actuellement affichée en haut de la marketplace (badge En Vedette)."
-                : "Astuce : passez par l'onglet Visibilité pour placer cette offre tout en haut de la marketplace."}
+                ? "Votre fiche est en Vedette : mise en avant sur la marketplace avec son badge pendant 24h."
+                : "Astuce : passez par l'onglet Visibilité pour mettre votre fiche en avant sur la marketplace pendant 24h."}
             </p>
           </>
         ) : null}
@@ -3195,7 +3194,7 @@ function OptionsScreen({
           </h2>
         </div>
         <p className="mt-2 text-sm text-muted-foreground">
-          Débloquez votre site web sur-mesure et des promos illimitées.
+          Débloquez votre site web sur-mesure et jusqu'à 3 offres simultanées incluses.
         </p>
         {commerce.site_actif ? (
           <div className="mt-4 space-y-2">
@@ -3270,18 +3269,19 @@ function OptionsScreen({
           {isAssociation ? (
             <>
               Facultatif : votre fiche et vos événements restent gratuits et illimités. Le
-              sponsoring les place tout en haut du fil d'actualité pendant 24h.
+              sponsoring les place au-dessus des fiches gratuites, parmi les Site Pro, pendant 24h.
             </>
           ) : vipEligible ? (
             <>
               En plus de votre visibilité prioritaire dans le fil général, l'Option À la Une (9 €)
-              place votre fiche dans le carrousel VIP situé entre la bannière du haut et le fil.
+              place votre fiche pendant 24h dans le carrousel VIP situé entre la bannière du haut et
+              le fil.
             </>
           ) : (
             <>
-              Sans abonnement Site Pro, l'Option Vedette (9 €) place votre fiche tout en haut du fil
-              d'actualité général. L'accès au carrousel VIP « À la Une » nécessite l'abonnement Site
-              Pro.
+              Sans abonnement Site Pro, l'Option Vedette (9 €) place votre fiche parmi les Site Pro,
+              au-dessus des fiches gratuites, pendant 24h. L'accès au carrousel VIP « À la Une »
+              nécessite l'abonnement Site Pro.
             </>
           )}
         </p>
