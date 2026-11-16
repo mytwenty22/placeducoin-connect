@@ -26,17 +26,21 @@ const BUTTON_CLASS =
   "rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60";
 // La Base Adresse Nationale tolère 50 requêtes par seconde : large marge pour un import.
 const GEOCODE_CONCURRENCY = 5;
+// Fiches enregistrées par appel : chaque appel reste loin du délai de 8 s imposé par Supabase aux
+// requêtes des utilisateurs connectés, quelle que soit la taille du fichier.
+const INSERT_BATCH_SIZE = 100;
 
 type NewFiche = Omit<FicheCsvRow, "codePostal"> & {
   codePostal: string;
   quartierId: string | null;
 };
 type CreateResult = { created: number; skipped: string[] };
+type ImportProgress = { step: "geocode" | "save"; done: number };
 
 async function createFiches(
   villeId: string,
   fiches: NewFiche[],
-  onProgress?: (done: number) => void,
+  onProgress?: (progress: ImportProgress) => void,
 ): Promise<CreateResult> {
   const payload: object[] = new Array(fiches.length);
   let next = 0;
@@ -59,17 +63,31 @@ async function createFiches(
         latitude: position?.lat ?? null,
         longitude: position?.lng ?? null,
       };
-      onProgress?.(++done);
+      onProgress?.({ step: "geocode", done: ++done });
     }
   }
   await Promise.all(Array.from({ length: GEOCODE_CONCURRENCY }, worker));
 
-  const { data, error } = await supabase.rpc("admin_create_unclaimed_fiches", {
-    p_ville_id: villeId,
-    p_fiches: payload,
-  });
-  if (error) throw new Error(error.message);
-  return data as CreateResult;
+  // Un lot interrompu n'empêche pas de relancer le fichier : les fiches déjà créées sont ignorées.
+  const result: CreateResult = { created: 0, skipped: [] };
+  for (let start = 0; start < payload.length; start += INSERT_BATCH_SIZE) {
+    onProgress?.({ step: "save", done: start });
+    const { data, error } = await supabase.rpc("admin_create_unclaimed_fiches", {
+      p_ville_id: villeId,
+      p_fiches: payload.slice(start, start + INSERT_BATCH_SIZE),
+    });
+    if (error) {
+      throw new Error(
+        start === 0
+          ? error.message
+          : `${error.message} (${result.created} fiche(s) déjà créée(s) : relancez le même fichier pour terminer.)`,
+      );
+    }
+    const batch = data as CreateResult;
+    result.created += batch.created;
+    result.skipped.push(...batch.skipped);
+  }
+  return result;
 }
 
 function downloadTemplate() {
@@ -242,7 +260,7 @@ function ImportFichesCsv({ onImported }: { onImported: () => void }) {
   const [fileName, setFileName] = useState("");
   const [rows, setRows] = useState<FicheCsvRow[] | null>(null);
   const [fileError, setFileError] = useState<{ message: string; details: string[] } | null>(null);
-  const [progress, setProgress] = useState<number | null>(null);
+  const [progress, setProgress] = useState<ImportProgress | null>(null);
 
   async function handleFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -272,7 +290,7 @@ function ImportFichesCsv({ onImported }: { onImported: () => void }) {
       toast.error(localityError);
       return;
     }
-    setProgress(0);
+    setProgress({ step: "geocode", done: 0 });
     try {
       const { villeId } = await resolveLocality({
         ...locality,
@@ -354,8 +372,8 @@ function ImportFichesCsv({ onImported }: { onImported: () => void }) {
           className={`${BUTTON_CLASS} inline-flex items-center gap-2`}
         >
           <Upload className="h-4 w-4" />
-          {importing
-            ? `Localisation des adresses… ${progress}/${rows.length}`
+          {progress
+            ? `${progress.step === "geocode" ? "Localisation des adresses" : "Enregistrement des fiches"}… ${progress.done}/${rows.length}`
             : `Importer ${rows.length} fiche${rows.length > 1 ? "s" : ""} de ${fileName}`}
         </button>
       ) : null}

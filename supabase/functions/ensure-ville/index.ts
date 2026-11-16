@@ -7,6 +7,10 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "
 
 // Référentiel officiel des communes (API Découpage administratif, publique et sans clé).
 const GEO_API_URL = "https://geo.api.gouv.fr/communes";
+// L'API répond d'habitude en moins d'une seconde mais connaît des lenteurs : délai large et une
+// reprise, pour ne pas faire échouer un import CSV entier sur un appel lent.
+const GEO_API_TIMEOUT_MS = 15_000;
+const GEO_API_ATTEMPTS = 2;
 
 type Commune = { nom: string; code: string; codeDepartement: string; codesPostaux: string[] };
 
@@ -25,6 +29,31 @@ function slugify(text: string) {
     .replace(/[̀-ͯ]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
+}
+
+class GeoApiError extends Error {}
+
+/** Commune officielle, null si le code INSEE n'existe pas ; GeoApiError si l'API est injoignable. */
+async function fetchCommune(insee: string): Promise<Commune | null> {
+  for (let attempt = 1; attempt <= GEO_API_ATTEMPTS; attempt++) {
+    try {
+      const res = await fetch(
+        `${GEO_API_URL}/${insee}?fields=nom,code,codeDepartement,codesPostaux`,
+        {
+          signal: AbortSignal.timeout(GEO_API_TIMEOUT_MS),
+        },
+      );
+      if (res.status === 404) return null;
+      if (res.ok) return (await res.json()) as Commune;
+      if (res.status < 500 && res.status !== 429) break;
+    } catch (error) {
+      console.error(`geo.api.gouv.fr, tentative ${attempt} :`, error);
+    }
+    if (attempt < GEO_API_ATTEMPTS) await new Promise((r) => setTimeout(r, 1000));
+  }
+  throw new GeoApiError(
+    "Le référentiel des communes (geo.api.gouv.fr) ne répond pas. Réessayez dans quelques instants.",
+  );
 }
 
 /**
@@ -49,15 +78,25 @@ Deno.serve(async (req) => {
       return json({ error: "Code commune invalide." }, 400);
     }
 
-    const res = await fetch(
-      `${GEO_API_URL}/${insee}?fields=nom,code,codeDepartement,codesPostaux`,
-      { signal: AbortSignal.timeout(8000) },
-    );
-    if (res.status === 404) return json({ error: "Commune introuvable." }, 400);
-    if (!res.ok) return json({ error: "Référentiel des communes indisponible." }, 503);
-    const commune = (await res.json()) as Commune;
-
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const { data: known, error: knownError } = await admin
+      .from("villes")
+      .select("id, nom, slug")
+      .eq("insee_code", insee)
+      .maybeSingle();
+    if (knownError) throw knownError;
+
+    let commune: Commune | null;
+    try {
+      commune = await fetchCommune(insee);
+    } catch (error) {
+      // Commune déjà connue : ses codes postaux ne seront rafraîchis qu'au prochain appel.
+      if (error instanceof GeoApiError && known) return json(known);
+      if (error instanceof GeoApiError) return json({ error: error.message }, 503);
+      throw error;
+    }
+    if (!commune) return json({ error: "Commune introuvable." }, 400);
+
     const patch = {
       nom: commune.nom,
       department_code: commune.codeDepartement,

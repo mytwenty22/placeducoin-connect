@@ -59,4 +59,25 @@ describe("parseFichesCsv", () => {
   it("signale les colonnes manquantes", () => {
     expect(errorsOf("nom;adresse\nA B;1 rue A\n")[0]).toContain("categorie, telephone");
   });
+
+  it("lit un export d'annuaire en virgules, adresses entre guillemets", () => {
+    const fiches = parseFichesCsv(
+      [
+        "nom,adresse,metier,categorie,telephone,code_postal",
+        'PADOCA Boulangerie Bio,"86 Avenue de Picot, 33320 Eysines",Boulanger,Alimentation & Bouche,+33 5 56 24 25 16,33320',
+        'Oxana Flor,"325 Avenue du Taillan-Médoc, 33320 EYSINES",Fleuriste,Boutiques & Mode,05 00 00 00 00,33320',
+      ].join("\n"),
+    );
+    expect(fiches).toEqual([
+      {
+        nom: "PADOCA Boulangerie Bio",
+        adresse: "86 Avenue de Picot, 33320 Eysines",
+        category: "bouche",
+        telephone: "+33 5 56 24 25 16",
+        trade: "Boulanger",
+        codePostal: "33320",
+      },
+      expect.objectContaining({ nom: "Oxana Flor", category: "boutiques", trade: "Fleuriste" }),
+    ]);
+  });
 });
