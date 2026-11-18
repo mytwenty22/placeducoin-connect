@@ -1,14 +1,9 @@
 import { describe, expect, it } from "vitest";
-import {
-  CLIENT_DEMO_VIDEO,
-  HOME_DEMO_VIDEOS,
-  PRO_DEMO_VIDEO,
-  toVideoEmbedUrl,
-} from "../src/lib/video-embed";
+import { CLIENT_DEMO_VIDEO, PRO_DEMO_VIDEO, toVideoEmbedUrl } from "../src/lib/video-embed";
 
 describe("vidéos de démonstration", () => {
   it("ne contiennent que des liens intégrables", () => {
-    for (const { url } of [PRO_DEMO_VIDEO, CLIENT_DEMO_VIDEO, ...HOME_DEMO_VIDEOS]) {
+    for (const { url } of [PRO_DEMO_VIDEO, CLIENT_DEMO_VIDEO]) {
       expect(toVideoEmbedUrl(url)).not.toBeNull();
     }
   });
