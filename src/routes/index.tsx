@@ -40,6 +40,7 @@ import type { Horaire } from "@/lib/horaires";
 import type { ThemeVisuel } from "@/lib/site-theme";
 import { LEGAL_DOCS } from "@/lib/legal";
 import { deCommune } from "@/lib/french";
+import { publicPhone } from "@/lib/phone";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -167,7 +168,7 @@ function mapCommerceToListing(row: CommerceRow, fallbackCity: string): CommerceL
     longitude: row.longitude,
     distanceKm: 0,
     address: row.adresse ?? "",
-    phone: row.telephone ?? "",
+    phone: publicPhone(row.telephone),
     sponsored: isBoostActive(row),
     premium: row.site_actif,
     ...(row.photo_url ? { photoUrl: row.photo_url } : {}),

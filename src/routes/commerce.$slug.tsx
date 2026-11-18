@@ -26,6 +26,7 @@ import { logStatEvent, isFromGoogleReferrer } from "@/lib/stats-tracking";
 import type { Horaire } from "@/lib/horaires";
 import type { Prestation } from "@/lib/prestations";
 import { getSiteTheme, type ThemeVisuel } from "@/lib/site-theme";
+import { publicPhone } from "@/lib/phone";
 
 async function loadRealOffer(slug: string): Promise<Offer | null> {
   const { data: commerce } = await supabase
@@ -95,7 +96,7 @@ async function loadRealOffer(slug: string): Promise<Offer | null> {
     endsInHours,
     sponsored: false,
     address: commerce.adresse ?? "",
-    phone: commerce.telephone ?? "",
+    phone: publicPhone(commerce.telephone),
     hours: ((commerce.horaires as Horaire[] | null) ?? []).map((h) => ({
       day: h.jour,
       value: h.valeur,
@@ -433,13 +434,15 @@ function ShopSite() {
             />
           ) : null}
           <div className="mt-5 flex flex-wrap gap-2">
-            <a
-              href={`tel:${offer.phone.replace(/\s/g, "")}`}
-              className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold transition-opacity hover:opacity-90"
-              style={{ color: theme.accentOnLight }}
-            >
-              <Phone className="h-4 w-4" /> {offer.phone}
-            </a>
+            {offer.phone ? (
+              <a
+                href={`tel:${offer.phone.replace(/\s/g, "")}`}
+                className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold transition-opacity hover:opacity-90"
+                style={{ color: theme.accentOnLight }}
+              >
+                <Phone className="h-4 w-4" /> {offer.phone}
+              </a>
+            ) : null}
             <a
               href={`https://maps.google.com/?q=${encodeURIComponent(offer.address)}`}
               target="_blank"

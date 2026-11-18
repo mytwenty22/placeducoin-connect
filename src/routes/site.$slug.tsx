@@ -27,6 +27,7 @@ import { getSiteTheme, siteThemeVars } from "@/lib/site-theme";
 import { logStatEvent, isFromGoogleReferrer } from "@/lib/stats-tracking";
 import { validateOfferSearch } from "@/lib/offer-search";
 import { LEGAL_DOCS } from "@/lib/legal";
+import { publicPhone } from "@/lib/phone";
 
 type SiteCommerce = {
   id: string;
@@ -127,7 +128,8 @@ export const Route = createFileRoute("/site/$slug")({
       : { data: [] };
 
     return {
-      commerce: commerce as SiteCommerce,
+      // Numéro fictif des fiches importées masqué ici, avant tout affichage ou lien tel:.
+      commerce: { ...commerce, telephone: publicPhone(commerce.telephone) || null } as SiteCommerce,
       promos: (promos ?? []) as SitePromo[],
       event: event as SiteEvent,
       produits: (produits ?? []) as SiteProduit[],

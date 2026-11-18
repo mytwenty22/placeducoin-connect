@@ -79,6 +79,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { PRO_TERMS_VERSION, recordLegalAcceptance } from "@/lib/legal";
+import { isPlaceholderPhone, publicPhone } from "@/lib/phone";
 
 type AccountType = "pro" | "association";
 
@@ -1147,7 +1148,9 @@ function ProfileScreen({
     newQuartier: null,
   });
   const queryClient = useQueryClient();
-  const [telephone, setTelephone] = useState(commerce.telephone ?? "");
+  // Fiche importée avec le numéro fictif : champ vide pour que le commerçant saisisse le vrai.
+  const placeholderPhone = isPlaceholderPhone(commerce.telephone);
+  const [telephone, setTelephone] = useState(placeholderPhone ? "" : (commerce.telephone ?? ""));
   const [photoUrl, setPhotoUrl] = useState(commerce.photo_url ?? "");
   const [logoUrl, setLogoUrl] = useState(commerce.logo_url ?? "");
   const [themeVisuel, setThemeVisuel] = useState<ThemeVisuel>(commerce.theme_visuel);
@@ -1424,7 +1427,9 @@ function ProfileScreen({
               quartier_id: resolved.quartierId,
               adresse,
               code_postal: locality.codePostal,
-              telephone,
+              // Laissé vide sur une fiche importée : on garde le numéro fictif (toujours masqué),
+              // qui permet de repérer depuis /admin les fiches encore sans vrai numéro.
+              telephone: placeholderPhone && !telephone.trim() ? commerce.telephone : telephone,
               photo_url: photoUrl || null,
               logo_url: logoUrl || null,
               description: description || null,
@@ -1709,7 +1714,7 @@ function ProfileScreen({
                 city: "",
                 distanceKm: 0,
                 address: adresse,
-                phone: telephone,
+                phone: publicPhone(telephone),
                 sponsored: isBoostActive(commerce),
                 premium: commerce.site_actif,
                 ...(photoUrl ? { photoUrl } : {}),
@@ -1774,7 +1779,20 @@ function ProfileScreen({
           longitude={commerce.longitude}
           onUpdated={onUpdated}
         />
-        <Field label="Téléphone" value={telephone} onChange={setTelephone} />
+        <div>
+          <Field
+            label="Téléphone"
+            value={telephone}
+            onChange={setTelephone}
+            placeholder="Ex : 05 56 12 34 56"
+          />
+          {placeholderPhone && !telephone.trim() ? (
+            <p className="mt-1 text-xs font-medium text-amber-700">
+              Aucun numéro n'est affiché sur votre fiche : renseignez votre téléphone pour que vos
+              clients puissent vous appeler.
+            </p>
+          ) : null}
+        </div>
         <Field
           label="Lien du compte Instagram"
           value={instagram}
@@ -2402,7 +2420,7 @@ function PromoScreen({
                 city: "",
                 distanceKm: 0,
                 address: commerce.adresse ?? "",
-                phone: commerce.telephone ?? "",
+                phone: publicPhone(commerce.telephone),
                 sponsored: isBoostActive(commerce),
                 premium: commerce.site_actif,
                 ...(commerce.photo_url ? { photoUrl: commerce.photo_url } : {}),
