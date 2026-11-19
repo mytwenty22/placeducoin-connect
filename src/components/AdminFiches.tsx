@@ -2,7 +2,17 @@ import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { BadgeCheck, Ban, ExternalLink, Pencil, RotateCcw, Search, Store, X } from "lucide-react";
+import {
+  BadgeCheck,
+  Ban,
+  Eye,
+  ExternalLink,
+  Pencil,
+  RotateCcw,
+  Search,
+  Store,
+  X,
+} from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { isBoostActive } from "@/lib/boost";
 
@@ -30,15 +40,26 @@ type FicheRow = {
   siret: string | null;
   rna: string | null;
   legal_name: string | null;
+  // Fusionnés depuis commerces (admin_list_fiches ne les renvoie pas).
+  masquee_at?: string | null;
+  masquage_motif?: string | null;
 };
 
-type Status = "pending" | "validated" | "suspended";
+type Masquage = { id: string; masquee_at: string; masquage_motif: string | null };
+
+type Status = "pending" | "validated" | "masked" | "suspended";
 type AccountType = "pro" | "free" | "association";
 
 const STATUS_META: Record<Status, { label: string; className: string }> = {
   pending: { label: "En attente de vérification", className: "bg-amber-100 text-amber-800" },
   validated: { label: "Validé", className: "bg-emerald-100 text-emerald-800" },
+  masked: { label: "Masquée", className: "bg-slate-200 text-slate-700" },
   suspended: { label: "Suspendu", className: "bg-red-100 text-red-700" },
+};
+
+const MASQUAGE_MOTIFS: Record<string, string> = {
+  hors_perimetre: "hors périmètre du lancement",
+  fermee_ou_remplacee: "commerce fermé ou local repris",
 };
 
 const TYPE_META: Record<AccountType, string> = {
@@ -49,6 +70,7 @@ const TYPE_META: Record<AccountType, string> = {
 
 function statusOf(f: FicheRow): Status {
   if (f.suspended_at) return "suspended";
+  if (f.masquee_at) return "masked";
   return f.verification_status === "verifie" ? "validated" : "pending";
 }
 
@@ -60,6 +82,24 @@ function typeOf(f: FicheRow): AccountType {
 }
 
 const LIST_KEY = ["admin-fiches"];
+const MASQUAGE_KEY = ["admin-fiches-masquage"];
+const PAGE_SIZE = 1000;
+
+/** Fiches masquées (lisibles par un admin via la policy de lecture), par pages de 1000. */
+async function fetchMasquages(): Promise<Masquage[]> {
+  const rows: Masquage[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("commerces")
+      .select("id, masquee_at, masquage_motif")
+      .not("masquee_at", "is", null)
+      .order("id")
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    rows.push(...((data ?? []) as Masquage[]));
+    if (!data || data.length < PAGE_SIZE) return rows;
+  }
+}
 
 /**
  * Gestion des fiches commerçants et associations : statut, validation, modification et
@@ -109,7 +149,27 @@ export function AdminFiches() {
     onError: (error: Error) => toast.error(error.message),
   });
 
-  const fiches = useMemo(() => fichesQuery.data ?? [], [fichesQuery.data]);
+  const masquageQuery = useQuery({ queryKey: MASQUAGE_KEY, queryFn: fetchMasquages });
+
+  const unmaskMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.rpc("admin_unmask_fiche", { p_commerce_id: id });
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      toast.success("Fiche réaffichée : elle est de nouveau visible sur le site");
+      void queryClient.invalidateQueries({ queryKey: MASQUAGE_KEY });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const fiches = useMemo(() => {
+    const masked = new Map((masquageQuery.data ?? []).map((m) => [m.id, m]));
+    return (fichesQuery.data ?? []).map((f) => {
+      const m = masked.get(f.commerce_id);
+      return m ? { ...f, masquee_at: m.masquee_at, masquage_motif: m.masquage_motif } : f;
+    });
+  }, [fichesQuery.data, masquageQuery.data]);
 
   const villes = useMemo(
     () =>
@@ -134,13 +194,13 @@ export function AdminFiches() {
   }, [fiches, villeFilter, typeFilter, search]);
 
   const counts = useMemo(() => {
-    const c: Record<Status, number> = { pending: 0, validated: 0, suspended: 0 };
+    const c: Record<Status, number> = { pending: 0, validated: 0, masked: 0, suspended: 0 };
     for (const f of scoped) c[statusOf(f)]++;
     return c;
   }, [scoped]);
 
   const visible = statusFilter ? scoped.filter((f) => statusOf(f) === statusFilter) : scoped;
-  const busy = statusMutation.isPending;
+  const busy = statusMutation.isPending || unmaskMutation.isPending;
 
   return (
     <section>
@@ -207,6 +267,11 @@ export function AdminFiches() {
         {fichesQuery.isError ? (
           <p className="text-sm text-destructive">{(fichesQuery.error as Error).message}</p>
         ) : null}
+        {masquageQuery.isError ? (
+          <p className="text-sm text-destructive">
+            Fiches masquées non chargées : {(masquageQuery.error as Error).message}
+          </p>
+        ) : null}
         {fichesQuery.data && visible.length === 0 ? (
           <p className="text-sm text-muted-foreground">Aucune fiche ne correspond à ces filtres.</p>
         ) : null}
@@ -250,9 +315,26 @@ export function AdminFiches() {
                   {f.suspension_reason ? ` — ${f.suspension_reason}` : ""}
                 </p>
               ) : null}
+              {f.masquee_at ? (
+                <p className="mt-2 rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-700">
+                  Masquée du site le {new Date(f.masquee_at).toLocaleDateString("fr-FR")}
+                  {f.masquage_motif
+                    ? ` — ${MASQUAGE_MOTIFS[f.masquage_motif] ?? f.masquage_motif}`
+                    : ""}
+                </p>
+              ) : null}
 
               <div className="mt-3 flex flex-wrap gap-1.5">
-                {status !== "validated" ? (
+                {f.masquee_at ? (
+                  <ActionButton
+                    tone="success"
+                    disabled={busy}
+                    onClick={() => unmaskMutation.mutate(f.commerce_id)}
+                  >
+                    <Eye className="h-3.5 w-3.5" /> Réafficher
+                  </ActionButton>
+                ) : null}
+                {status !== "validated" && !f.masquee_at ? (
                   <ActionButton
                     tone="success"
                     disabled={busy}
