@@ -35,3 +35,4 @@ dist-ssr
 .vercel
 .env*
 supabase/.temp
+export.geojson
