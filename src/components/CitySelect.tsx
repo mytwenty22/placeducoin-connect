@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, Loader2, MapPin } from "lucide-react";
 import { useAllQuartiers, type CityOption, type Ville } from "@/hooks/use-villes";
+import { rankCitiesByName } from "@/lib/city-search";
 import { searchCommunes } from "@/lib/communes";
 import { normalizeSearch } from "@/lib/utils";
 
@@ -82,7 +83,9 @@ export function CitySelect({
 
   const sections = useMemo(() => {
     const local: Row[] = [];
-    for (const v of villes) {
+    // Saisie d'un nom : seulement les communes qui le contiennent, les plus pertinentes d'abord.
+    const candidates = q && !isDigits ? rankCitiesByName(villes, q) : villes;
+    for (const v of candidates) {
       if (!q) {
         local.push({
           key: v.id,
@@ -120,7 +123,7 @@ export function CitySelect({
             option: { kind: "ville", ville: v, codePostal: null },
           });
         }
-      } else if (normalizeSearch(v.nom).includes(q)) {
+      } else {
         local.push({
           key: v.id,
           label: v.nom,
