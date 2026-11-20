@@ -1,0 +1,63 @@
+﻿nom,adresse,categorie,telephone,metier,code_postal
+Au Plaisir de Bien Manger,"1 Avenue Gabriele d'Annunzio, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Boucher,33600
+Boucherie de Cap de Bos,"Centre commercial Cap de Bos, Avenue du Général Leclerc, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Boucher,33600
+Boucherie du Centre Moreau,"1 Avenue Jean Jaurès, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Boucher,33600
+Boucherie à la Bonne Adresse,"14 Rue Stéphane Hessel, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Boucher,33600
+Boucherie-Charcuterie à la Bonne Adresse,"374 Avenue du Maréchal de Lattre de Tassigny, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Boucher,33600
+Chez Gwen,"8 Avenue Roger Cohé, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Boucher,33600
+La Boucherie de Pessac,"20 Avenue Arago, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Boucher,33600
+La Grande Boucherie,"3 Avenue Gustave Eiffel, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Boucher,33600
+Boulangerie Carcamo,"38 Rue de l'Horloge, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Boulanger,33600
+Boulangerie Carcamo,"16 Rue d'Artois, Centre commercial Cap de Bos, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Boulanger,33600
+Boulangerie Honoré,"755 Cours de la Libération, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Boulanger,33600
+Boulangerie Madran,"60 Avenue de Madran, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Boulanger,33600
+Boulangerie Pâtisserie Sandwicherie,"29 Rue du Serpent, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Boulanger,33600
+Boulangerie du Monteil,"202 B Avenue Pasteur, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Boulanger,33600
+Farine et Cacao,"4 Rue Jacques Cartier, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Boulanger,33600
+Karmador,"13 Avenue Gustave Eiffel, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Boulanger,33600
+Le Boulot Campagnard,"5 Avenue de Candau, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Boulanger,33600
+Le Fils des Artisans,"22 Avenue Jean Cordier, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Boulanger,33600
+Le Fournil de Pessac,"57 Avenue Jean Jaurès, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Boulanger,33600
+Le Fournil des Co-Pains,"9 Boulevard du Haut Livrac, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Boulanger,33600
+Le Pétrin de Jeanne,"10 B Avenue Jean Jaurès, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Boulanger,33600
+Lika Patiss,"Rue Charles Péguy, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Boulanger,33600
+Maison Fortin,"13 Avenue du Général Leclerc, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Boulanger,33600
+Pessapain,"1 B Avenue Gustave Eiffel, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Boulanger,33600
+Le Homard,"Centre commercial Arago, Esplanade Alcide Bontou, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Poissonnier,33600
+Zinc Marine,"43 Bis Avenue Jean Jaurès, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Poissonnier,33600
+Craft Pessac,"11 Place de la Liberté, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Pâtissier,33600
+La Maison Patissons,"67 Rue Sarah Bernhardt, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Pâtissier,33600
+Les Saveurs de Mayalea,"24 Rue des Résédas, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Pâtissier,33600
+Lutibou,"7 Rue Léon Morin, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Pâtissier,33600
+Chabei,"6 Rue des Poilus, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Épicier / Fromager,33600
+Cunégonde,"18 Avenue Gustave Eiffel, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Épicier / Fromager,33600
+Fromagerie Dauchez,"30 Avenue Pasteur, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Épicier / Fromager,33600
+L'Atelier du Bio,"14 Avenue Jean Jaurès, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Épicier / Fromager,33600
+La Maison des Vignobles Terroirs et Traditions,"69 Avenue Jean Cordier, 33600 Pessac",Alimentation & Bouche,05 00 00 00 00,Épicier / Fromager,33600
+Décojardin,"21 Voie Romaine, 33600 Pessac",Boutiques & Mode,05 00 00 00 00,Fleuriste,33600
+Le Jardin d'Alexandra,"18 Rue Léon Morin, 33600 Pessac",Boutiques & Mode,05 00 00 00 00,Fleuriste,33600
+Le Petit Fleuriste,"25 Place de la Cinquième République, 33600 Pessac",Boutiques & Mode,05 00 00 00 00,Fleuriste,33600
+Phula,"67 Avenue du Vallon, 33600 Pessac",Boutiques & Mode,05 00 00 00 00,Fleuriste,33600
+Encre Blanche,"15 Place de la Cinquième République, 33600 Pessac",Boutiques & Mode,05 00 00 00 00,Libraire,33600
+Le Mangaka,"15 Avenue Roger Cohé, 33600 Pessac",Boutiques & Mode,05 00 00 00 00,Libraire,33600
+Librairie de la Comédie,"4 Allée de la Crabette, 33600 Pessac",Boutiques & Mode,05 00 00 00 00,Libraire,33600
+Cobilac,"17 Avenue Sainte-Marie, 33600 Pessac",Boutiques & Mode,05 00 00 00 00,Prêt-à-porter,33600
+Dalouche Kingdom,"13 Avenue Roger Cohé, 33600 Pessac",Boutiques & Mode,05 00 00 00 00,Prêt-à-porter,33600
+Happy Look,"1 T Avenue Gustave Eiffel, Centre commercial Bois de Bersol, 33600 Pessac",Boutiques & Mode,05 00 00 00 00,Prêt-à-porter,33600
+La Boutique Entraînement,"Centre commercial Pessac Bersol, Avenue Arago, 33600 Pessac",Boutiques & Mode,05 00 00 00 00,Prêt-à-porter,33600
+La Dentellière,"14 Avenue Pasteur, 33600 Pessac",Boutiques & Mode,05 00 00 00 00,Prêt-à-porter,33600
+Le Comptoir de P'ssac,"2 Avenue Jean Jaurès, 33600 Pessac",Boutiques & Mode,05 00 00 00 00,Prêt-à-porter,33600
+Les Nains de Jardin,"9 Avenue Roger Cohé, 33600 Pessac",Boutiques & Mode,05 00 00 00 00,Prêt-à-porter,33600
+Pure Salouva,"2 Allée Claude Monet, 33600 Pessac",Boutiques & Mode,05 00 00 00 00,Prêt-à-porter,33600
+Ripost,"16 Rue Léon Morin, 33600 Pessac",Boutiques & Mode,05 00 00 00 00,Prêt-à-porter,33600
+Rêve de Soie,"7 Rue Léon Morin, 33600 Pessac",Boutiques & Mode,05 00 00 00 00,Prêt-à-porter,33600
+Sahomashop,"156 Avenue Jean Jaurès, 33600 Pessac",Boutiques & Mode,05 00 00 00 00,Prêt-à-porter,33600
+Stock Chic Boutique,"Avenue de la Châtaigneraie, 33600 Pessac",Boutiques & Mode,05 00 00 00 00,Prêt-à-porter,33600
+Streetfight,"3 Rue des Rosières, 33600 Pessac",Boutiques & Mode,05 00 00 00 00,Prêt-à-porter,33600
+Vêtements Cazaux,"54 Avenue Pasteur, 33600 Pessac",Boutiques & Mode,05 00 00 00 00,Prêt-à-porter,33600
+Alouette Optique,"31 T Avenue du Général Leclerc, 33600 Pessac",Services & Bien-être,05 00 00 00 00,Opticien,33600
+Heco Vision,"85 Avenue Bougnard, 33600 Pessac",Services & Bien-être,05 00 00 00 00,Opticien,33600
+Jeannette,"292 Avenue Pasteur, 33600 Pessac",Services & Bien-être,05 00 00 00 00,Opticien,33600
+Les Prunelles de Pessac,"28 Avenue Pasteur, 33600 Pessac",Services & Bien-être,05 00 00 00 00,Opticien,33600
+Raison d'y Voir,"Centre commercial Arago, Résidence Arago I, 33600 Pessac",Services & Bien-être,05 00 00 00 00,Opticien,33600
+Sevun,"2 Allée du Doyen Georges Brus, 33600 Pessac",Services & Bien-être,05 00 00 00 00,Opticien,33600
