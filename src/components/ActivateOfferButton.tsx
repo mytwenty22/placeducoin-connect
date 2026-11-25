@@ -13,6 +13,29 @@ import { SupportAmountPrompt } from "@/components/SupportAmountPrompt";
 // rayon de 100 m (position "réseau" d'un ordinateur, GPS pas encore verrouillé en intérieur…).
 const MAX_ACCURACY_M = 150;
 
+// Délai pendant lequel le client peut déclarer son montant (même borne que declarer_soutien()).
+const SUPPORT_WINDOW_MS = 24 * 3600 * 1000;
+
+// « Passer » est mémorisé par validation sur cet appareil, pour ne pas reposer la question à
+// chaque visite de la fiche.
+function supportSkipKey(activationId: string) {
+  return `pdc:soutien-passe:${activationId}`;
+}
+function readSupportSkipped(activationId: string): boolean {
+  try {
+    return window.localStorage.getItem(supportSkipKey(activationId)) === "1";
+  } catch {
+    return false;
+  }
+}
+function writeSupportSkipped(activationId: string) {
+  try {
+    window.localStorage.setItem(supportSkipKey(activationId), "1");
+  } catch {
+    // Stockage indisponible : l'encart sera simplement reproposé à la prochaine visite.
+  }
+}
+
 type ActivateResponse =
   | { status: "activated" | "already_active" | "already_used"; expires_at: string }
   | { status: "too_far"; distance_m: number }
@@ -200,10 +223,6 @@ export function ActivateOfferButton({
   const [gpsFailed, setGpsFailed] = useState(false);
   const [pinMode, setPinMode] = useState(false);
   const [pin, setPin] = useState("");
-  // Encart facultatif « Combien avez-vous dépensé ? », proposé une fois l'écran vert refermé
-  // (l'écran vert reste réservé à la preuve de validation montrée au commerçant).
-  const [askSupport, setAskSupport] = useState(false);
-
   // Une activation déjà faite par ce client (même après un rechargement de page) : c'est elle qui
   // dit s'il peut rouvrir l'écran vert (< 5 min) ou si le coupon est utilisé.
   const activationQuery = useQuery({
@@ -212,14 +231,42 @@ export function ActivateOfferButton({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("promo_activations")
-        .select("created_at, expires_at")
+        .select("id, created_at, expires_at")
         .eq("promo_id", promoId)
         .eq("user_id", userId!)
         .maybeSingle();
       if (error) throw new Error(error.message);
-      return data as { created_at: string; expires_at: string } | null;
+      return data as { id: string; created_at: string; expires_at: string } | null;
     },
   });
+
+  // Encart facultatif « Combien avez-vous dépensé ? » : affiché (écran vert refermé) tant que ce
+  // coupon validé n'a pas encore de montant enregistré, y compris une fois « Coupon utilisé » et
+  // après un rechargement. Limité aux 24 h qui suivent la validation, comme declarer_soutien().
+  const activationId = activationQuery.data?.id ?? null;
+  const supportOpen =
+    activationQuery.data !== null &&
+    activationQuery.data !== undefined &&
+    Date.now() - new Date(activationQuery.data.created_at).getTime() < SUPPORT_WINDOW_MS;
+  const supportQuery = useQuery({
+    queryKey: ["soutien-activation", activationId],
+    enabled: Boolean(activationId) && supportOpen,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("soutiens_locaux")
+        .select("id")
+        .eq("activation_id", activationId!)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      return data;
+    },
+  });
+  const [supportSkipped, setSupportSkipped] = useState(false);
+  useEffect(() => {
+    if (activationId) setSupportSkipped(readSupportSkipped(activationId));
+  }, [activationId]);
+  const showSupportPrompt =
+    supportOpen && supportQuery.isSuccess && supportQuery.data === null && !supportSkipped;
 
   const expiresAt = activationQuery.data
     ? new Date(activationQuery.data.expires_at).getTime()
@@ -300,7 +347,6 @@ export function ActivateOfferButton({
       case "activated":
       case "already_active":
         setConfirming(false);
-        if (result.status === "activated") setAskSupport(true);
         await queryClient.invalidateQueries({ queryKey: ["promo-activation", promoId, userId] });
         setScreenOpen(true);
         return;
@@ -363,7 +409,6 @@ export function ActivateOfferButton({
         setConfirming(false);
         setPinMode(false);
         setGpsFailed(false);
-        if (result.status === "activated") setAskSupport(true);
         await queryClient.invalidateQueries({ queryKey: ["promo-activation", promoId, userId] });
         setScreenOpen(true);
         return;
@@ -558,11 +603,17 @@ export function ActivateOfferButton({
         </p>
       ) : null}
 
-      {askSupport && !screenOpen ? (
+      {showSupportPrompt && !screenOpen && activationId ? (
         <SupportAmountPrompt
           promoId={promoId}
           shopName={shopName}
-          onDone={() => setAskSupport(false)}
+          onSaved={() =>
+            void queryClient.invalidateQueries({ queryKey: ["soutien-activation", activationId] })
+          }
+          onSkip={() => {
+            writeSupportSkipped(activationId);
+            setSupportSkipped(true);
+          }}
         />
       ) : null}
 

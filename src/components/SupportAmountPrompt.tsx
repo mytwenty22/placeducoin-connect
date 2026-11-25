@@ -18,11 +18,15 @@ type DeclareResponse = {
 export function SupportAmountPrompt({
   promoId,
   shopName,
-  onDone,
+  onSaved,
+  onSkip,
 }: {
   promoId: string;
   shopName: string;
-  onDone: () => void;
+  /** Montant enregistré (ou déjà présent) : l'encart peut disparaître. */
+  onSaved: () => void;
+  /** « Passer » : le client ne souhaite pas déclarer de montant pour ce passage. */
+  onSkip: () => void;
 }) {
   const queryClient = useQueryClient();
   const [selected, setSelected] = useState<number | null>(null);
@@ -43,19 +47,32 @@ export function SupportAmountPrompt({
     });
     setBusy(false);
     if (error) {
-      toast.error("Impossible d'enregistrer votre soutien pour le moment.");
+      // Message Supabase réel (fonction absente, droits, réseau…) pour faciliter le diagnostic.
+      console.error("declarer_soutien a échoué", error);
+      toast.error(`Impossible d'enregistrer votre soutien : ${error.message}`);
       return;
     }
     const result = data as DeclareResponse;
-    if (result.status === "saved") {
-      toast.success("Merci pour votre soutien au commerce local !");
-      await queryClient.invalidateQueries({ queryKey: ["soutien-local-total"] });
-    } else if (result.status === "already_declared") {
-      toast.info("Votre soutien pour ce passage est déjà enregistré.");
-    } else {
-      toast.error("Ce montant n'a pas pu être enregistré.");
+    switch (result.status) {
+      case "saved":
+        toast.success("Merci pour votre soutien au commerce local !");
+        await queryClient.invalidateQueries({ queryKey: ["soutien-local-total"] });
+        onSaved();
+        return;
+      case "already_declared":
+        toast.info("Votre soutien pour ce passage est déjà enregistré.");
+        onSaved();
+        return;
+      case "too_late":
+        toast.error("Le montant ne peut plus être déclaré : la validation date de plus de 24 h.");
+        onSkip();
+        return;
+      case "no_activation":
+        toast.error("Aucune validation de coupon trouvée pour cette offre sur votre compte.");
+        return;
+      default:
+        toast.error(`Indiquez un montant entre 1 et ${MAX_SUPPORT_AMOUNT} €.`);
     }
-    onDone();
   }
 
   return (
@@ -123,7 +140,7 @@ export function SupportAmountPrompt({
         </button>
         <button
           type="button"
-          onClick={onDone}
+          onClick={onSkip}
           className="text-xs font-medium text-muted-foreground underline-offset-2 hover:underline"
         >
           Passer
