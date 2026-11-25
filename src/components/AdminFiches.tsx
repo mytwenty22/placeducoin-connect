@@ -7,6 +7,7 @@ import {
   Ban,
   Eye,
   ExternalLink,
+  KeyRound,
   Pencil,
   RotateCcw,
   Search,
@@ -85,6 +86,27 @@ const LIST_KEY = ["admin-fiches"];
 const MASQUAGE_KEY = ["admin-fiches-masquage"];
 const PAGE_SIZE = 1000;
 
+/**
+ * Toutes les fiches, par pages de 1000 : l'API Supabase plafonne chaque réponse à 1000 lignes
+ * (max_rows), y compris pour un RPC. Sans pagination, les fiches les plus anciennes (tri par date
+ * décroissante) disparaissaient de la liste et de la recherche. Le tri secondaire par id rend
+ * l'ordre stable entre deux pages (les imports en masse partagent la même date de création).
+ */
+async function fetchAllFiches(): Promise<FicheRow[]> {
+  const rows = new Map<string, FicheRow>();
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await supabase
+      .rpc("admin_list_fiches")
+      .order("created_at", { ascending: false })
+      .order("commerce_id")
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    const page = (data ?? []) as FicheRow[];
+    for (const row of page) rows.set(row.commerce_id, row);
+    if (page.length < PAGE_SIZE) return [...rows.values()];
+  }
+}
+
 /** Fiches masquées (lisibles par un admin via la policy de lecture), par pages de 1000. */
 async function fetchMasquages(): Promise<Masquage[]> {
   const rows: Masquage[] = [];
@@ -112,15 +134,9 @@ export function AdminFiches() {
   const [statusFilter, setStatusFilter] = useState<Status | "">("");
   const [search, setSearch] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [passwordId, setPasswordId] = useState<string | null>(null);
 
-  const fichesQuery = useQuery({
-    queryKey: LIST_KEY,
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("admin_list_fiches");
-      if (error) throw new Error(error.message);
-      return (data ?? []) as FicheRow[];
-    },
-  });
+  const fichesQuery = useQuery({ queryKey: LIST_KEY, queryFn: fetchAllFiches });
 
   const statusMutation = useMutation({
     mutationFn: async (input: {
@@ -187,7 +203,7 @@ export function AdminFiches() {
         (!villeFilter || f.ville_id === villeFilter) &&
         (!typeFilter || typeOf(f) === typeFilter) &&
         (!needle ||
-          [f.nom, f.email, f.trade, f.siret, f.rna, f.legal_name].some((v) =>
+          [f.nom, f.slug, f.email, f.trade, f.siret, f.rna, f.legal_name].some((v) =>
             v?.toLocaleLowerCase("fr").includes(needle),
           )),
     );
@@ -243,7 +259,7 @@ export function AdminFiches() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Nom, e-mail, SIRET…"
+            placeholder="Nom, slug, e-mail, SIRET…"
             className="w-full rounded-xl border border-input bg-card py-2.5 pl-9 pr-3 text-sm outline-none focus:border-navy"
           />
         </label>
@@ -287,7 +303,18 @@ export function AdminFiches() {
                   <p className="truncate font-semibold text-foreground">{f.nom}</p>
                   <p className="truncate text-xs text-muted-foreground">
                     {[f.trade, f.ville_nom].filter(Boolean).join(" · ")}
-                    {f.email ? ` · ${f.email}` : ""}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {f.owner_id ? (
+                      <>
+                        Propriétaire :{" "}
+                        <span className="font-medium text-foreground">
+                          {f.email ?? "compte sans e-mail"}
+                        </span>
+                      </>
+                    ) : (
+                      "Sans propriétaire (fiche non réclamée)"
+                    )}
                   </p>
                   <p className="truncate text-xs text-muted-foreground">
                     {identifier ?? "Aucun SIRET / RNA"}
@@ -382,7 +409,21 @@ export function AdminFiches() {
                 >
                   <ExternalLink className="h-3.5 w-3.5" /> Voir
                 </Link>
+                {f.owner_id ? (
+                  <ActionButton
+                    disabled={busy}
+                    onClick={() =>
+                      setPasswordId(passwordId === f.commerce_id ? null : f.commerce_id)
+                    }
+                  >
+                    <KeyRound className="h-3.5 w-3.5" /> Changer le mot de passe
+                  </ActionButton>
+                ) : null}
               </div>
+
+              {passwordId === f.commerce_id ? (
+                <SetPasswordForm fiche={f} onClose={() => setPasswordId(null)} />
+              ) : null}
 
               {editingId === f.commerce_id ? (
                 <EditFicheForm
@@ -482,6 +523,101 @@ function EditFicheForm({
         </button>
       </div>
     </form>
+  );
+}
+
+const MIN_PASSWORD_LENGTH = 8;
+
+/** Nouveau mot de passe du propriétaire, appliqué par l'Edge Function admin-set-password. */
+function SetPasswordForm({ fiche, onClose }: { fiche: FicheRow; onClose: () => void }) {
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const mismatch = confirm.length > 0 && confirm !== password;
+  const valid = password.length >= MIN_PASSWORD_LENGTH && confirm === password;
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.functions.invoke("admin-set-password", {
+        body: { commerce_id: fiche.commerce_id, password },
+      });
+      if (error) {
+        // Réponse non-2xx : le message utile est dans le corps JSON renvoyé par la fonction.
+        const context = (error as { context?: Response }).context;
+        const body = context ? await context.json().catch(() => null) : null;
+        throw new Error((body as { error?: string } | null)?.error ?? error.message);
+      }
+    },
+    onSuccess: () => {
+      toast.success(`Mot de passe changé pour ${fiche.email ?? "le propriétaire"}`);
+      onClose();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  return (
+    <form
+      className="mt-3 space-y-2 border-t border-border pt-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (valid) mutation.mutate();
+      }}
+    >
+      <p className="text-xs text-muted-foreground">
+        Nouveau mot de passe pour{" "}
+        <span className="font-semibold text-foreground">{fiche.email ?? "le propriétaire"}</span>.
+        Communiquez-le au commerçant par un canal sûr.
+      </p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <PasswordField label="Nouveau mot de passe" value={password} onChange={setPassword} />
+        <PasswordField label="Confirmation" value={confirm} onChange={setConfirm} />
+      </div>
+      {password.length > 0 && password.length < MIN_PASSWORD_LENGTH ? (
+        <p className="text-xs text-destructive">Au moins {MIN_PASSWORD_LENGTH} caractères.</p>
+      ) : mismatch ? (
+        <p className="text-xs text-destructive">Les deux mots de passe ne correspondent pas.</p>
+      ) : null}
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={!valid || mutation.isPending}
+          className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-60"
+        >
+          {mutation.isPending ? "Enregistrement…" : "Appliquer le nouveau mot de passe"}
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex items-center gap-1 rounded-lg bg-secondary px-3 py-1.5 text-xs font-semibold text-foreground"
+        >
+          <X className="h-3.5 w-3.5" /> Annuler
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function PasswordField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </span>
+      <input
+        type="password"
+        autoComplete="new-password"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="mt-1 w-full rounded-lg border border-input bg-card px-2.5 py-1.5 text-sm outline-none focus:border-navy"
+      />
+    </label>
   );
 }
 
