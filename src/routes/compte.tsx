@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
 import { ClientDemoCard } from "@/components/ClientDemoCard";
 import { EmailPasswordLogin } from "@/components/EmailPasswordLogin";
+import { LocalSupportCard } from "@/components/LocalSupportCard";
 import { useSession } from "@/hooks/use-session";
 import { useToggleFavorite } from "@/hooks/use-favorites";
 import { supabase } from "@/lib/supabase";
@@ -228,6 +229,8 @@ function AccountDashboard({ userId, email }: { userId: string; email: string }) 
           <LogOut className="h-3.5 w-3.5" /> Se déconnecter
         </button>
       </div>
+
+      <LocalSupportCard userId={userId} />
 
       <section className="mt-8">
         <h2 className="flex items-center gap-2 font-display text-xl font-extrabold text-foreground">

@@ -7,6 +7,7 @@ import { GeoPositionError, getCurrentPositionOnce, positionErrorMessage } from "
 import { supabase } from "@/lib/supabase";
 import { logStatEvent } from "@/lib/stats-tracking";
 import { offerInstallOnFirstCoupon } from "@/lib/pwa-install";
+import { SupportAmountPrompt } from "@/components/SupportAmountPrompt";
 
 // Au-delà, la précision annoncée par le GPS est trop faible pour prouver une présence dans un
 // rayon de 100 m (position "réseau" d'un ordinateur, GPS pas encore verrouillé en intérieur…).
@@ -199,6 +200,9 @@ export function ActivateOfferButton({
   const [gpsFailed, setGpsFailed] = useState(false);
   const [pinMode, setPinMode] = useState(false);
   const [pin, setPin] = useState("");
+  // Encart facultatif « Combien avez-vous dépensé ? », proposé une fois l'écran vert refermé
+  // (l'écran vert reste réservé à la preuve de validation montrée au commerçant).
+  const [askSupport, setAskSupport] = useState(false);
 
   // Une activation déjà faite par ce client (même après un rechargement de page) : c'est elle qui
   // dit s'il peut rouvrir l'écran vert (< 5 min) ou si le coupon est utilisé.
@@ -296,6 +300,7 @@ export function ActivateOfferButton({
       case "activated":
       case "already_active":
         setConfirming(false);
+        if (result.status === "activated") setAskSupport(true);
         await queryClient.invalidateQueries({ queryKey: ["promo-activation", promoId, userId] });
         setScreenOpen(true);
         return;
@@ -358,6 +363,7 @@ export function ActivateOfferButton({
         setConfirming(false);
         setPinMode(false);
         setGpsFailed(false);
+        if (result.status === "activated") setAskSupport(true);
         await queryClient.invalidateQueries({ queryKey: ["promo-activation", promoId, userId] });
         setScreenOpen(true);
         return;
@@ -550,6 +556,14 @@ export function ActivateOfferButton({
             ) : null}
           </span>
         </p>
+      ) : null}
+
+      {askSupport && !screenOpen ? (
+        <SupportAmountPrompt
+          promoId={promoId}
+          shopName={shopName}
+          onDone={() => setAskSupport(false)}
+        />
       ) : null}
 
       {screenOpen && expiresAt !== null ? (

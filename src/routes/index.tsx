@@ -10,6 +10,7 @@ import { BottomSponsorBanner } from "@/components/BottomSponsorBanner";
 import { InstallAppBanner } from "@/components/InstallAppBanner";
 import { FavoritesPushCard, PushOptInCard } from "@/components/PushOptIn";
 import { CommerceMap, type MapBounds } from "@/components/CommerceMap";
+import { IntentionButtons } from "@/components/IntentionButtons";
 import { fetchCommuneCenter } from "@/lib/map-geocode";
 import { OfferCard } from "@/components/OfferCard";
 import { RadiusSelector } from "@/components/RadiusSelector";
@@ -623,6 +624,8 @@ function Marketplace() {
               />
             </form>
           </div>
+
+          <IntentionButtons />
         </div>
       </section>
 
