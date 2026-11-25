@@ -124,6 +124,34 @@ const COMMERCE_COLUMNS =
 // Plafond de repères chargés pour la zone visible de la carte (exploration hors de la ville).
 const MAP_AREA_LIMIT = 300;
 
+// Taille des pages de la liste d'une ville (plafond max_rows de l'API Supabase).
+const CITY_PAGE_SIZE = 1000;
+
+// Référence stable : un nouveau tableau vide à chaque rendu relancerait les useMemo de la liste
+// (et le redessin des marqueurs de la carte).
+const NO_MATCHES: CommerceListing[] = [];
+
+/**
+ * Recherche par nom sur toute la table commerces (toutes communes), insensible à la casse et aux
+ * accents (RPC search_commerces), puis relecture des fiches avec leurs offres en cours.
+ */
+async function searchCommercesByName(query: string): Promise<CommerceListing[]> {
+  const { data: ids, error } = await supabase.rpc("search_commerces", { p_query: query });
+  if (error) throw error;
+  const idList = ((ids ?? []) as { id: string }[]).map((r) => r.id);
+  if (idList.length === 0) return [];
+  const { data, error: rowsError } = await supabase
+    .from("commerces")
+    .select(`${COMMERCE_COLUMNS}, villes(nom, insee_code)`)
+    .in("id", idList)
+    .gt("promos.valide_jusqu_a", new Date().toISOString());
+  if (rowsError) throw rowsError;
+  return (data as unknown as CommerceRow[]).filter(isMarketplaceEligible).map((row) => {
+    const v = Array.isArray(row.villes) ? row.villes[0] : row.villes;
+    return { ...mapCommerceToListing(row, v?.nom ?? ""), inseeCode: v?.insee_code ?? null };
+  });
+}
+
 // Une offre est encore "active" tant que sa date de fin n'est pas passée -- la requête filtre
 // déjà côté serveur (`.gt("promos.valide_jusqu_a", …)`), ce second filtre ne fait que se prémunir
 // d'un léger décalage d'horloge entre le moment de la requête et le rendu.
@@ -252,16 +280,24 @@ function Marketplace() {
   const commercesQuery = useQuery({
     queryKey: ["commerces-marketplace", selectedVille?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("commerces")
-        .select(COMMERCE_COLUMNS)
-        .eq("is_demo", false)
-        .eq("ville_id", selectedVille?.id)
-        .gt("promos.valide_jusqu_a", new Date().toISOString());
-      if (error) throw error;
-      return (data as unknown as CommerceRow[])
-        .filter(isMarketplaceEligible)
-        .map((row) => mapCommerceToListing(row, city));
+      // Par pages : l'API plafonne chaque réponse à 1000 lignes ; tri par id pour des pages stables.
+      const nowIso = new Date().toISOString();
+      const rows: CommerceRow[] = [];
+      for (let from = 0; ; from += CITY_PAGE_SIZE) {
+        const { data, error } = await supabase
+          .from("commerces")
+          .select(COMMERCE_COLUMNS)
+          .eq("is_demo", false)
+          .eq("ville_id", selectedVille?.id)
+          .gt("promos.valide_jusqu_a", nowIso)
+          .order("id")
+          .range(from, from + CITY_PAGE_SIZE - 1);
+        if (error) throw error;
+        const page = data as unknown as CommerceRow[];
+        rows.push(...page);
+        if (page.length < CITY_PAGE_SIZE) break;
+      }
+      return rows.filter(isMarketplaceEligible).map((row) => mapCommerceToListing(row, city));
     },
     enabled: !!selectedVille && !isExternal,
     // L'option Vedette expire au bout de 24h sans qu'aucune écriture en base ne le déclenche :
@@ -299,6 +335,25 @@ function Marketplace() {
 
   const searchQuery = normalizeSearch(query);
   const isSearching = searchQuery.length > 0;
+
+  // Recherche par nom en base sur toutes les fiches (pas seulement celles déjà chargées, du
+  // quartier ou du rayon GPS), lancée après une courte pause de frappe.
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const id = window.setTimeout(() => setDebouncedSearch(searchQuery), 250);
+    return () => window.clearTimeout(id);
+  }, [searchQuery]);
+  const nameSearchQuery = useQuery({
+    queryKey: ["commerces-name-search", debouncedSearch],
+    enabled: debouncedSearch.length >= 2,
+    staleTime: 30_000,
+    queryFn: () => searchCommercesByName(debouncedSearch),
+  });
+  // Ignore une réponse pour une ancienne saisie (ou si la recherche a été effacée).
+  const nameMatches =
+    isSearching && debouncedSearch === searchQuery && nameSearchQuery.data
+      ? nameSearchQuery.data
+      : NO_MATCHES;
 
   // Tous les quartiers rattachés à la commune sélectionnée (table quartiers, créés par code postal
   // depuis les fiches), y compris ceux qui n'ont pas encore de fiche (compteur à 0).
@@ -450,13 +505,19 @@ function Marketplace() {
   // pour une commune sans fiche, les fiches des alentours (catégorie/recherche seulement).
   const filtered = useMemo(() => {
     let data = (isExternal ? mapAreaQuery.data : commercesQuery.data) ?? [];
+    // Recherche : toutes les fiches chargées qui correspondent (sans filtre de quartier ni de code
+    // postal), complétées par celles trouvées par nom dans toute la base.
+    if (isSearching) {
+      const local = data.filter((c) => matchesSearch(c, searchQuery));
+      const seen = new Set(local.map((c) => c.id));
+      return [...local, ...nameMatches.filter((c) => !seen.has(c.id))];
+    }
     if (!isExternal && activeQuartierId) {
       data = data.filter((c) => c.quartierId === activeQuartierId);
     }
     if (!isExternal && selectedCodePostal) {
       data = data.filter((c) => c.codePostal === selectedCodePostal);
     }
-    if (isSearching) return data.filter((c) => matchesSearch(c, searchQuery));
     if (category === null) return data;
     return data.filter((c) => c.category === category);
   }, [
@@ -467,6 +528,7 @@ function Marketplace() {
     selectedCodePostal,
     isSearching,
     searchQuery,
+    nameMatches,
     category,
   ]);
   const listLoading = isExternal ? mapAreaQuery.isLoading : commercesQuery.isLoading;
@@ -474,17 +536,22 @@ function Marketplace() {
   // Mémoïsé : la carte redessine ses marqueurs (et ferme un pop-up ouvert) à chaque nouvelle liste.
   const visibleCommerces = useMemo(() => {
     const withDistance = withComputedDistance(filtered, position);
-    const inRadius = radiusApplies
-      ? withDistance.filter((c) => c.distanceKm <= radiusKm)
-      : withDistance;
+    // Une recherche par nom n'est jamais limitée au rayon GPS.
+    const inRadius =
+      radiusApplies && !isSearching
+        ? withDistance.filter((c) => c.distanceKm <= radiusKm)
+        : withDistance;
     return sortMarketplace(inRadius, VISIT_SEED);
-  }, [filtered, position, radiusApplies, radiusKm]);
+  }, [filtered, position, radiusApplies, radiusKm, isSearching]);
 
   // Liste de la ville (avec tous ses filtres) + repères des autres communes de la zone, filtrés
   // par la même catégorie / recherche. Commune sans fiche : la liste EST déjà la zone.
   const mapCommerces = useMemo(() => {
     if (isExternal) return visibleCommerces;
-    const inCity = new Set((commercesQuery.data ?? []).map((c) => c.id));
+    const inCity = new Set([
+      ...(commercesQuery.data ?? []).map((c) => c.id),
+      ...visibleCommerces.map((c) => c.id),
+    ]);
     const extra = (mapAreaQuery.data ?? []).filter(
       (c) =>
         !inCity.has(c.id) &&

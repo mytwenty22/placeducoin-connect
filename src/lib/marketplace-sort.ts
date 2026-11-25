@@ -40,15 +40,44 @@ function compareByProximity(a: Sortable, b: Sortable, seed: string): number {
 }
 
 /**
- * Liste de la marketplace : bloc Pro (Site Pro + fiches gratuites boostées), puis fiches gratuites.
- * Dans chaque bloc : tranche de distance croissante, puis rotation.
+ * Offre ou promo flash en cours (promo, arrivage). Un simple événement n'en est pas une. Les offres
+ * embarquées sont déjà limitées aux non expirées par la requête de la marketplace.
  */
-export function sortMarketplace<T extends Sortable & { premium: boolean; sponsored: boolean }>(
-  commerces: T[],
-  seed: string,
-): T[] {
-  const block = (c: T) => (c.premium || c.sponsored ? 0 : 1);
-  return [...commerces].sort((a, b) => block(a) - block(b) || compareByProximity(a, b, seed));
+export function hasActiveOffer(commerce: { promos?: readonly { kind: string }[] }): boolean {
+  return (commerce.promos ?? []).some((p) => p.kind !== "evenement");
+}
+
+function byRotation(a: Sortable, b: Sortable, seed: string): number {
+  return rotationRank(a.slug, seed) - rotationRank(b.slug, seed) || a.slug.localeCompare(b.slug);
+}
+
+/**
+ * Liste de la marketplace, par blocs de priorité stricte (Pro = Site Pro ou Vedette en cours) :
+ * 0) Pro avec une offre en cours,
+ * 1) Pro sans offre,
+ * 2) fiches gratuites avec une offre en cours : rotation pure à chaque visite, sans tranche de
+ *    distance, pour qu'aucune ne reste figée devant les autres,
+ * 3) toutes les autres fiches.
+ * Blocs 0, 1 et 3 : tranche de distance croissante, puis rotation.
+ */
+export function sortMarketplace<
+  T extends Sortable & {
+    premium: boolean;
+    sponsored: boolean;
+    promos?: readonly { kind: string }[];
+  },
+>(commerces: T[], seed: string): T[] {
+  const block = (c: T) => {
+    const pro = c.premium || c.sponsored;
+    const offer = hasActiveOffer(c);
+    if (pro) return offer ? 0 : 1;
+    return offer ? 2 : 3;
+  };
+  return [...commerces].sort((a, b) => {
+    const diff = block(a) - block(b);
+    if (diff !== 0) return diff;
+    return block(a) === 2 ? byRotation(a, b, seed) : compareByProximity(a, b, seed);
+  });
 }
 
 /** Emplacement Boost Site Pro : les favoris du visiteur d'abord, puis proximité et rotation. */

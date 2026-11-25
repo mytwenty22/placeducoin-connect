@@ -3,12 +3,20 @@ import { isMarketplaceEligible, sortBoostSpot, sortMarketplace } from "../src/li
 import { withComputedDistance } from "../src/lib/geo";
 
 const SEED = "visite-1";
-const shop = (slug: string, distanceKm: number, premium = false, sponsored = false) => ({
+const OFFER = [{ kind: "promo" }];
+const shop = (
+  slug: string,
+  distanceKm: number,
+  premium = false,
+  sponsored = false,
+  promos: { kind: string }[] = [],
+) => ({
   id: slug,
   slug,
   distanceKm,
   premium,
   sponsored,
+  promos,
 });
 const slugs = (list: { slug: string }[]) => list.map((c) => c.slug);
 const order = (list: ReturnType<typeof shop>[]) => slugs(sortMarketplace(list, SEED));
@@ -21,6 +29,36 @@ describe("sortMarketplace", () => {
   it("fait entrer une fiche gratuite boostée dans le bloc Pro, classée par distance", () => {
     const list = [shop("pro", 12, true), shop("gratuit", 0.2), shop("booste", 1.5, false, true)];
     expect(order(list)).toEqual(["booste", "pro", "gratuit"]);
+  });
+
+  it("respecte les 4 blocs : Pro+offre, Pro, gratuit+offre, autres", () => {
+    const list = [
+      shop("gratuit", 0.1),
+      shop("boucherie-b", 0.2, false, false, OFFER),
+      shop("pro-sans-offre", 0.3, true),
+      shop("la-maison-m", 15, true, true, OFFER),
+    ];
+    expect(order(list)).toEqual(["la-maison-m", "pro-sans-offre", "boucherie-b", "gratuit"]);
+  });
+
+  it("ne compte pas un simple événement comme une offre en cours", () => {
+    const list = [
+      shop("evenement", 0.2, false, false, [{ kind: "evenement" }]),
+      shop("offre", 9, false, false, OFFER),
+    ];
+    expect(order(list)).toEqual(["offre", "evenement"]);
+  });
+
+  it("fait tourner les fiches gratuites avec offre, quelle que soit leur distance", () => {
+    const list = Array.from({ length: 20 }, (_, i) =>
+      shop(`offre-${i}`, i === 0 ? 0.1 : 15, false, false, OFFER),
+    );
+    expect(order([...list].reverse())).toEqual(order(list));
+    const leaders = new Set(
+      Array.from({ length: 14 }, (_, visit) => sortMarketplace(list, `visite-${visit}`)[0]?.slug),
+    );
+    // La plus proche n'est pas figée en tête : la rotation ignore la distance dans ce bloc.
+    expect(leaders.size).toBeGreaterThan(3);
   });
 
   it("trie chaque bloc par tranche de distance croissante", () => {
